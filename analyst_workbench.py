@@ -25,6 +25,8 @@ Run (after one-time install):
 
 The app starts instantly with the same minimal demo data used by
 test_phase4j_workbench_flows_v0.2.py (and extended for 4L) so behavior is reproducible.
+
+# Force full rebuild - stale build cache workaround 2026-06-13
 """
 
 import json
