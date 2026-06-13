@@ -19,6 +19,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, List, Optional, Set
 
+# FriendProfile for active guide (imported here for thin presenters only)
+from .friend_profile import FriendProfile, create_example_friend_profile
+
 # =============================================================================
 # Canonical Narrative Taxonomy (LOCKED ENUM – no free-text drift)
 # =============================================================================
@@ -1961,6 +1964,159 @@ def build_friend_note(
         "view": friend_view,
         "provenance": friend_view.get("provenance", {}),
         "guardrail": "This note is strictly advisory and contains no new decision logic or recommendations.",
+    }
+
+
+# =============================================================================
+# Friend Mode Identity Card (Phase 4K+ evolution)
+# Thin presenter only. Surfaces key elements of FriendProfile in a trust-building
+# way at the top of Friend Mode. All "guidance framing" lives here.
+# Does not affect Hero Band or Analyst mode.
+# =============================================================================
+
+def get_friend_identity_card_data(
+    portfolio_id: str,
+    registry: PortfolioRegistry,
+    friend_profile: Optional[FriendProfile] = None,
+) -> Dict[str, Any]:
+    """
+    Thin presenter for the Friend Mode Identity Card.
+
+    Returns structured data for a clean, elegant panel that makes the user feel
+    "seen" by the guide. Designed to sit at the top of Friend Mode.
+
+    The card answers: "This is who you are to me, and this is how I'm guiding you."
+    """
+    if not registry.get(portfolio_id):
+        return {
+            "portfolio_id": portfolio_id,
+            "error": "unknown portfolio",
+            "personality_type": "Unknown",
+            "primary_goals": [],
+            "key_constraints": {},
+            "behavioral_tendencies_accounted": [],
+            "communication_tone": "balanced",
+            "framing": "I don't have enough context on this portfolio yet.",
+            "provenance": {"source": "friend_profile", "version": 0},
+        }
+
+    if friend_profile is None:
+        # Demo / fallback profile for current live surface.
+        # In production this would come from user session or persisted profile.
+        friend_profile = create_example_friend_profile(profile_id=f"{portfolio_id}_friend")
+
+    goals_display = friend_profile.primary_goals or ["long_term_growth"]
+    constraints_display = friend_profile.risk_constraints or {"max_drawdown_pct": "Not specified"}
+    tendencies = friend_profile.behavioral_tendencies or ["None flagged yet"]
+
+    framing = (
+        f"I'm guiding you as a {friend_profile.personality_type.lower()} investor. "
+        f"I will respect your goals, stay within your caps, and watch for the tendencies "
+        f"you've shared with me."
+    )
+
+    return {
+        "portfolio_id": portfolio_id,
+        "personality_type": friend_profile.personality_type,
+        "primary_goals": goals_display,
+        "key_constraints": constraints_display,
+        "behavioral_tendencies_accounted": tendencies,
+        "communication_tone": friend_profile.communication_preference,
+        "framing": framing,
+        "provenance": {
+            "source": "friend_profile",
+            "version": friend_profile.version,
+            "profile_id": friend_profile.profile_id,
+        },
+    }
+
+
+# =============================================================================
+# First Guided Question (Phase 4K+ active guide)
+# Thin presenter. Uses FriendProfile + current portfolio context to surface
+# one high-value next question the user should be asking.
+# All logic here. No decision-layer impact.
+# =============================================================================
+
+def get_first_guided_question(
+    portfolio_id: str,
+    registry: PortfolioRegistry,
+    lifecycles: List[RecommendationLifecycle],
+    snapshot: Any,
+    friend_profile: Optional[FriendProfile] = None,
+) -> Dict[str, Any]:
+    """
+    Thin presenter that returns the Friend's first proactive, personalized question.
+
+    Goal: Lead the user to the next best question before they know to ask it.
+    The question is derived from the combination of:
+      - FriendProfile (goals, tendencies, constraints, personality)
+      - Current portfolio signals (from lifecycles)
+    """
+    if not registry.get(portfolio_id):
+        return {
+            "portfolio_id": portfolio_id,
+            "question": "Would you like to share more about your goals for this portfolio?",
+            "rationale": "I don't have a profile or recent data for this portfolio yet.",
+            "profile_signals_used": [],
+            "confidence": "low",
+            "provenance": {"source": "guided_question", "version": 1},
+        }
+
+    if friend_profile is None:
+        friend_profile = create_example_friend_profile(profile_id=f"{portfolio_id}_friend")
+
+    # Very lightweight, profile-driven logic for this micro-chunk.
+    # In later chunks this can grow into a proper question architect.
+    tendencies = friend_profile.behavioral_tendencies or []
+    goals = friend_profile.primary_goals or []
+
+    # Simple signal detection from existing lifecycles (no new scoring)
+    has_strength = any("STRENGTHEN" in getattr(lc, "current_status", "") for lc in lifecycles)
+    has_decay = any("DECAY" in getattr(lc, "current_status", "") for lc in lifecycles)
+
+    if "recency_bias" in tendencies and has_strength:
+        question = (
+            "Your recent performance looks strong. Given your profile shows a tendency toward recency bias, "
+            "have you considered whether this strength is sustainable or if it's time to stress-test the assumptions behind it?"
+        )
+        rationale = (
+            f"Because your FriendProfile flags recency_bias and your current lifecycles show STRENGTHENING signals, "
+            f"this is the question that can build long-term resilience for a {friend_profile.personality_type} investor."
+        )
+        signals = ["behavioral_tendencies.recency_bias", "lifecycle.strengthen"]
+    elif "loss_aversion" in tendencies and has_decay:
+        question = (
+            "Some positions are showing signs of weakening. As someone who tends toward loss aversion, "
+            "what would 'good enough' look like if you were to rebalance expectations here?"
+        )
+        rationale = "This question helps separate emotional attachment from your stated goals and constraints."
+        signals = ["behavioral_tendencies.loss_aversion", "lifecycle.decay"]
+    else:
+        # Default thoughtful question based on goals
+        goal_text = " and ".join(goals[:2]) if goals else "your long-term objectives"
+        question = (
+            f"Looking at the current picture, what would success look like for you in 18 months, "
+            f"specifically around {goal_text}?"
+        )
+        rationale = "Starting from your explicit goals helps the conversation stay anchored in what actually matters to you."
+        signals = ["primary_goals"]
+
+    return {
+        "portfolio_id": portfolio_id,
+        "question": question,
+        "rationale": rationale,
+        "profile_signals_used": signals,
+        "confidence": "medium",
+        "related_profile_elements": {
+            "personality": friend_profile.personality_type,
+            "tendencies": tendencies,
+        },
+        "provenance": {
+            "source": "guided_question",
+            "version": 1,
+            "profile_id": friend_profile.profile_id,
+        },
     }
 
 

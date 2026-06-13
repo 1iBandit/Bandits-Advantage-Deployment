@@ -66,6 +66,15 @@ from .narrative import (
     get_hero_decision_band_data,
 )
 
+# Phase 4K+ evolution — Friend as Active Guide (data model only in this chunk)
+# All guidance logic and UI will live in thin presenters.
+# FriendProfile never mutates Phase 3 objects or PortfolioSnapshot.
+from .friend_profile import (
+    FriendProfile,
+    create_example_friend_profile,
+    apply_profile_edits,
+)
+
 __all__ = [
     "save_snapshot",
     "load_latest_snapshot",
@@ -117,4 +126,8 @@ __all__ = [
     "FRIEND_LANGUAGE_VERSION",
     # Phase 4L Decision Surface (new)
     "get_hero_decision_band_data",
+    # FriendProfile (active guide data model — Phase 4K+ evolution)
+    "FriendProfile",
+    "create_example_friend_profile",
+    "apply_profile_edits",
 ]

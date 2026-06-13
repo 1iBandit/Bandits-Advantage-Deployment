@@ -9,9 +9,12 @@ It uses ONLY:
 - Thin presenters from src/engine/portfolio/narrative.py:
     - get_hero_decision_band_data (Phase 4L Hero Band)
     - get_friend_view_data / build_friend_note (locked Phase 4K child)
+    - get_friend_identity_card_data (Phase 4K+ Friend Identity Card)
+    - get_first_guided_question (Phase 4K+ active guide)
     - 4I/4J panel data
 - WorkbenchSessionState + flow mutators + render_full_workbench_with_flows from
   src/engine/portfolio/workbench_ui.py
+- FriendProfile model + apply_profile_edits (session-editable personalization layer)
 
 No new decision logic, no derived scores, no mutations of Phase 3 outputs,
 no feedback into the calibrated engine. All synthesis is confined to narrative.py.
@@ -50,8 +53,17 @@ from src.engine.portfolio.narrative import (
     get_friend_view_data,
     build_friend_note,
     FRIEND_LANGUAGE_VERSION,
+    # Phase 4K+ evolution – Friend Identity Card (thin presenter)
+    get_friend_identity_card_data,
+    # First Guided Question (active guide behavior)
+    get_first_guided_question,
     # Phase 4L Hero Decision Band (thin consumer only)
     get_hero_decision_band_data,
+)
+from src.engine.portfolio.friend_profile import (
+    FriendProfile,
+    create_example_friend_profile,
+    apply_profile_edits,
 )
 from src.engine.portfolio.workbench_ui import (
     WorkbenchSessionState,
@@ -352,6 +364,127 @@ def main():
         st.subheader("Friend Mode (4K) – Safe Translation Layer")
         st.caption(f"friend_language_version = {FRIEND_LANGUAGE_VERSION} | Pure presenter: get_friend_view_data")
 
+        # === Session-level editable FriendProfile (new in this micro-chunk) ===
+        # The user now has agency: edit the profile and immediately see the
+        # Identity Card and Guided Question adapt. Stored in st.session_state
+        # for this session only (persistent storage is a later chunk).
+        if "friend_profile" not in st.session_state or not isinstance(
+            st.session_state["friend_profile"], FriendProfile
+        ):
+            st.session_state["friend_profile"] = create_example_friend_profile(
+                profile_id=f"{state.selected_portfolio}_friend"
+            )
+
+        current_profile: FriendProfile = st.session_state["friend_profile"]
+
+        # === Friend Mode Identity Card ===
+        # Now passes the (potentially edited) profile so it reflects user input.
+        identity_card = get_friend_identity_card_data(
+            state.selected_portfolio, registry, friend_profile=current_profile
+        )
+
+        with st.container(border=True):
+            st.markdown("**️ Your Friend Identity**")
+            st.caption(identity_card.get("framing", ""))
+
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.metric("Personality", identity_card.get("personality_type", "—"))
+            with c2:
+                goals = identity_card.get("primary_goals", [])
+                st.markdown("**Primary Goals**")
+                st.caption(" • ".join(goals) if goals else "—")
+            with c3:
+                constraints = identity_card.get("key_constraints", {})
+                st.markdown("**Key Constraints**")
+                if constraints:
+                    for k, v in list(constraints.items())[:2]:
+                        st.caption(f"{k}: {v}")
+                else:
+                    st.caption("—")
+
+            tendencies = identity_card.get("behavioral_tendencies_accounted", [])
+            if tendencies:
+                st.markdown("**I'm watching for these tendencies:** " + ", ".join(tendencies))
+            st.caption("This card is the first visible expression of your FriendProfile.")
+
+        # === First Guided Question ===
+        # Now reacts to the live-edited profile.
+        guided = get_first_guided_question(
+            state.selected_portfolio, registry, lifecycles, snapshot, friend_profile=current_profile
+        )
+
+        with st.container(border=True):
+            st.markdown("**A question worth asking right now**")
+            st.markdown(f"> {guided.get('question', '')}")
+            st.caption(guided.get("rationale", ""))
+            signals = guided.get("profile_signals_used", [])
+            if signals:
+                st.caption("Drawn from: " + ", ".join(signals))
+            st.caption("This is the kind of question I will proactively bring forward for you.")
+
+        # === Editable Friend Profile form (the new interactive surface) ===
+        # Thin UI only. On submit we create a new immutable profile via the
+        # pure helper and store it in session_state. The card + question above
+        # will reflect the update on rerun.
+        with st.expander("✏️ Edit Your Friend Profile (affects this session only)", expanded=False):
+            with st.form(key="edit_friend_profile_form", clear_on_submit=False):
+                st.caption("Changes here update the Identity Card and Guided Question above immediately.")
+
+                new_personality = st.selectbox(
+                    "Personality Type",
+                    options=["GrowthSeeker", "CapitalPreserver", "IncomeOptimizer", "ContrarianOpportunist", "BalancedCore"],
+                    index=["GrowthSeeker", "CapitalPreserver", "IncomeOptimizer", "ContrarianOpportunist", "BalancedCore"].index(
+                        current_profile.personality_type
+                    ) if current_profile.personality_type in ["GrowthSeeker", "CapitalPreserver", "IncomeOptimizer", "ContrarianOpportunist", "BalancedCore"] else 4,
+                )
+
+                current_goals_str = ", ".join(current_profile.primary_goals) if current_profile.primary_goals else ""
+                new_goals_str = st.text_input(
+                    "Primary Goals (comma-separated)",
+                    value=current_goals_str,
+                    help="e.g. long_term_capital_growth, moderate_income",
+                )
+                new_goals = [g.strip() for g in new_goals_str.split(",") if g.strip()]
+
+                # Simple risk constraint editor (one key field for this chunk)
+                current_dd = current_profile.risk_constraints.get("max_drawdown_pct", 15.0)
+                new_max_dd = st.number_input(
+                    "Max Drawdown Tolerance (%)",
+                    min_value=5.0, max_value=50.0, value=float(current_dd), step=1.0
+                )
+
+                current_tend_str = ", ".join(current_profile.behavioral_tendencies) if current_profile.behavioral_tendencies else ""
+                new_tend_str = st.text_input(
+                    "Behavioral Tendencies to Watch (comma-separated)",
+                    value=current_tend_str,
+                    help="e.g. recency_bias, loss_aversion",
+                )
+                new_tendencies = [t.strip() for t in new_tend_str.split(",") if t.strip()]
+
+                new_comm = st.selectbox(
+                    "Communication Preference",
+                    options=["concise", "detailed", "question_driven", "story_driven", "balanced"],
+                    index=["concise", "detailed", "question_driven", "story_driven", "balanced"].index(
+                        current_profile.communication_preference
+                    ) if current_profile.communication_preference in ["concise", "detailed", "question_driven", "story_driven", "balanced"] else 4,
+                )
+
+                submitted = st.form_submit_button("Update Profile")
+
+            if submitted:
+                edits = {
+                    "personality_type": new_personality,
+                    "primary_goals": new_goals,
+                    "risk_constraints": {"max_drawdown_pct": new_max_dd},
+                    "behavioral_tendencies": new_tendencies,
+                    "communication_preference": new_comm,
+                }
+                updated_profile = apply_profile_edits(current_profile, edits)
+                st.session_state["friend_profile"] = updated_profile
+                st.success("Profile updated. The Identity Card and Guided Question above have adapted to your changes.")
+                st.rerun()
+
         friend_view = get_friend_view_data(
             state.selected_portfolio, registry, lifecycles, snapshot
         )
@@ -476,7 +609,7 @@ def main():
                 st.session_state.last_exported_note = note
                 st.success("Investigation Note captured (includes current view + full in-session state).")
         with col_exp2:
-            if st.session_state.last_exported_note:
+            if st.session_state.get("last_exported_note"):
                 note = st.session_state.last_exported_note
                 st.download_button(
                     label="Download note as .json",
@@ -484,8 +617,8 @@ def main():
                     file_name=f"investigation_{state.selected_portfolio}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                     mime="application/json",
                 )
-            with st.expander("Preview exported note"):
-                st.json(note)
+                with st.expander("Preview exported note"):
+                    st.json(note)
 
     # Footer / contract reminder (Phase 4L Decision Surface)
     st.divider()
