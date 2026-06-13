@@ -255,7 +255,7 @@ def main():
         view_mode = st.radio(
             "Mode",
             ["Analyst (4I+4J)", "Friend (4K)"],
-            index=0,
+            index=1,  # default to Friend (4K) so new features are visible on load
             horizontal=True,
             key="view_mode",
         )
@@ -384,7 +384,7 @@ def main():
         )
 
         with st.container(border=True):
-            st.markdown("**️ Your Friend Identity**")
+            st.subheader("️ Identity Card")
             st.caption(identity_card.get("framing", ""))
 
             c1, c2, c3 = st.columns(3)
@@ -406,7 +406,7 @@ def main():
             tendencies = identity_card.get("behavioral_tendencies_accounted", [])
             if tendencies:
                 st.markdown("**I'm watching for these tendencies:** " + ", ".join(tendencies))
-            st.caption("This card is the first visible expression of your FriendProfile.")
+            st.caption("This is the first visible expression of your Friend Profile.")
 
         # === First Guided Question ===
         # Now reacts to the live-edited profile.
@@ -415,7 +415,7 @@ def main():
         )
 
         with st.container(border=True):
-            st.markdown("**A question worth asking right now**")
+            st.subheader("Guided Question")
             st.markdown(f"> {guided.get('question', '')}")
             st.caption(guided.get("rationale", ""))
             signals = guided.get("profile_signals_used", [])
@@ -429,7 +429,7 @@ def main():
         # will reflect the update on rerun.
         with st.expander("✏️ Edit Your Friend Profile (affects this session only)", expanded=False):
             with st.form(key="edit_friend_profile_form", clear_on_submit=False):
-                st.caption("Changes here update the Identity Card and Guided Question above immediately.")
+                st.caption("Updating your Friend Profile helps me guide you with more clarity.")
 
                 new_personality = st.selectbox(
                     "Personality Type",
@@ -482,7 +482,7 @@ def main():
                 }
                 updated_profile = apply_profile_edits(current_profile, edits)
                 st.session_state["friend_profile"] = updated_profile
-                st.success("Profile updated. The Identity Card and Guided Question above have adapted to your changes.")
+                st.success("Your Friend Profile has been updated. The Identity Card and Guided Question have adapted to your changes.")
                 st.rerun()
 
         friend_view = get_friend_view_data(
@@ -557,7 +557,7 @@ def main():
             events = arcs_raw.get("events", [])
             if events:
                 st.markdown("**Structured data (what the renderer received):**")
-                st.dataframe(events, use_container_width="stretch", hide_index=True)
+                st.dataframe(events, width="stretch", hide_index=True)
             if arcs_raw.get("provenance"):
                 st.caption(f"Provenance: {arcs_raw['provenance']}")
 
@@ -568,7 +568,7 @@ def main():
             recs = life_raw.get("recommendations", [])
             if recs:
                 st.markdown("**Structured data:**")
-                st.dataframe(recs, use_container_width="content", hide_index=True)
+                st.dataframe(recs, width="content", hide_index=True)
 
         with tab_gov:
             st.markdown("**Official rendered panel (from workbench_ui.py):**")
@@ -585,7 +585,7 @@ def main():
             del_raw = view["raw_panel_data"].get("delivery_history", {})
             entries = del_raw.get("recent_entries", [])
             if entries:
-                st.dataframe(entries, use_container_width="stretch", hide_index=True)
+                st.dataframe(entries, width="stretch", hide_index=True)
 
         # Hypothesis Auditor (4J)
         if state.hypothesis_selected:
