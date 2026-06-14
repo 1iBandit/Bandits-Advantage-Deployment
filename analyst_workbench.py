@@ -368,6 +368,20 @@ def main():
         st.subheader("Friend Mode (4K)")
         st.caption("Guided companion experience powered by your Friend Profile.")
 
+        # Friend Mode color system styles (from locked Color System + Card Design)
+        # Applied to the .identity-card-wrapper class we inject around the Identity Card.
+        st.markdown("""
+<style>
+.identity-card-wrapper {
+    border: 4px solid #4A90E2 !important;
+    background-color: #E8F1FF55 !important;
+    border-radius: 12px !important;
+    padding: 1.5rem !important;
+    box-shadow: 0 0 12px rgba(74, 144, 226, 0.4) !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
         # === Session-level editable FriendProfile (new in this micro-chunk) ===
         # The user now has agency: edit the profile and immediately see the
         # Identity Card and Guided Question adapt. Stored in st.session_state
@@ -446,7 +460,11 @@ def main():
             state.selected_portfolio, registry, friend_profile=current_profile
         )
 
-        with st.container(border=True):
+        # Guaranteed wrapper for styling — Streamlit cannot optimize this away
+        # (replaces border=True which was being collapsed)
+        identity_card_wrapper = st.container()
+        with identity_card_wrapper:
+            st.markdown('<div class="identity-card-wrapper">', unsafe_allow_html=True)
             st.subheader("️ Identity Card")
             st.caption(identity_card.get("framing", ""))
 
@@ -470,6 +488,8 @@ def main():
             if tendencies:
                 st.markdown("**I'm watching for these tendencies:** " + ", ".join(tendencies))
             st.caption("This is the first visible expression of your Friend Profile.")
+
+            st.markdown('</div>', unsafe_allow_html=True)
 
         # === First Guided Question ===
         # Now reacts to the live-edited profile.
