@@ -86,6 +86,9 @@ from src.engine.portfolio.behavior import (
     get_portfolio_summary_for_active,
     export_registry_as_json,
     force_neutral_all_slots,
+    # v0.3 Persistence Layer
+    initialize_or_load_buddy_session,
+    trigger_encrypted_disk_sync,
 )
 from src.engine.portfolio.workbench_ui import (
     WorkbenchSessionState,
@@ -568,6 +571,11 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                 select_portfolio(state, new_slot)
             switch_to_slot(new_slot)
 
+        # v0.3 Persistence Layer: load or seed 1i_Bandit sandbox state early in Friend Mode
+        # This ensures the canonical December 2025 baseline or previously saved state is restored
+        # before any onboarding, ledger, or behavioral surfaces run.
+        initialize_or_load_buddy_session("1i_Bandit")
+
         # === Liam Onboarding Question Tree v0.1 (GROUNDING → TEACHING → REINFORCING) ===
         # Multi-step conversational flow for avoidant, first-paycheck user (Liam persona).
         # Placed early in Friend Mode for onboarding focus. Integrates with sandbox_ledger and behavioral_state.
@@ -718,6 +726,8 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                     "category": "Manual Bookkeeping",
                     "description": f"Added CASH entry from Liam onboarding"
                 })
+                # v0.3: persist the change to disk
+                trigger_encrypted_disk_sync("1i_Bandit")
                 st.success(
                     f"Perfect — your ${commit} first commitment is now reflected in the 1i_Bandit sandbox ledger as CASH. "
                     "This is how we practice the habit safely."
@@ -1179,6 +1189,8 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                             "category": "Manual Bookkeeping",
                             "description": f"Updated {target_ticker} shares or price"
                         })
+                        # v0.3: persist the change to disk
+                        trigger_encrypted_disk_sync("1i_Bandit")
                         st.success(
                             f"Ledger entry for {target_ticker} updated in session. "
                             "Identity alignment preserved."

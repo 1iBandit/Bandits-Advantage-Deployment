@@ -31,6 +31,14 @@ from .router import (
     export_registry_as_json,
     force_neutral_all_slots,
 )
+from .persistence import (
+    load_buddy_state_from_disk,
+    save_buddy_state_to_disk,
+    _ensure_directory_exists,
+    _get_state_file_path,
+    initialize_or_load_buddy_session,
+    trigger_encrypted_disk_sync,
+)
 
 __all__ = [
     "BehavioralEvent",
@@ -53,4 +61,11 @@ __all__ = [
     "get_portfolio_summary_for_active",
     "export_registry_as_json",
     "force_neutral_all_slots",
+    # v0.3 Persistence Layer (file-based for 1i_Bandit sandbox)
+    "load_buddy_state_from_disk",
+    "save_buddy_state_to_disk",
+    "_ensure_directory_exists",
+    "_get_state_file_path",
+    "initialize_or_load_buddy_session",
+    "trigger_encrypted_disk_sync",
 ]

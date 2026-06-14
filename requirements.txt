@@ -7,3 +7,4 @@ pytest>=7.0
 
 # Environment variable support (.env loading)
 python-dotenv>=1.0
+cryptography>=42.0  # For v0.3 lightweight encryption in persistence layer (Fernet)
