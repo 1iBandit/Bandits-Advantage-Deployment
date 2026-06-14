@@ -16,6 +16,7 @@ All mutators are pure with respect to st.session_state.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any, Dict, List, Optional
 
 import streamlit as st
@@ -46,32 +47,47 @@ DEFAULT_SLOTS = [
 ]
 
 
+REQUIRED_PROFILE_FIELDS = ["profile_id", "personality_type", "primary_goals", "risk_constraints"]
+
+
+def _ensure_dict_profile(profile: Any) -> Dict[str, Any]:
+    """Migration shim: convert namedtuple/dataclass/dict-like to dict."""
+    if isinstance(profile, dict):
+        return profile
+    if hasattr(profile, "to_dict"):
+        return profile.to_dict()
+    if hasattr(profile, "_asdict"):
+        return profile._asdict()
+    if hasattr(profile, "__dict__"):
+        return profile.__dict__.copy()
+    raise ValueError(f"Cannot convert profile to dict: {type(profile)}")
+
+
+def _validate_profile(profile: Dict[str, Any], slot_id: str) -> None:
+    """Schema validator to catch missing fields early."""
+    for field in REQUIRED_PROFILE_FIELDS:
+        if field not in profile:
+            raise ValueError(f"Profile for slot {slot_id} missing required field: {field}")
+
+
 def _default_profile_for_slot(slot_id: str, slot_name: str) -> Dict[str, Any]:
     """Create a default FriendProfile dict for the slot."""
     profile = create_example_friend_profile(profile_id=f"{slot_id}_friend")
     # Customize slightly per slot for demo variety (still session-only)
     if "INCOME" in slot_id:
-        profile = profile._replace(
+        profile = replace(
+            profile,
             primary_goals=["moderate_income", "capital_preservation"],
             risk_constraints={"max_drawdown_pct": 10.0},
         )
     elif "PRESERVATION" in slot_id:
-        profile = profile._replace(
+        profile = replace(
+            profile,
             risk_constraints={"max_drawdown_pct": 12.0},
         )
-    return profile.to_dict() if hasattr(profile, "to_dict") else {
-        "profile_id": profile.profile_id,
-        "personality_type": profile.personality_type,
-        "primary_goals": profile.primary_goals,
-        "risk_constraints": profile.risk_constraints,
-        "sector_caps": profile.sector_caps,
-        "ticker_caps": profile.ticker_caps,
-        "behavioral_tendencies": profile.behavioral_tendencies,
-        "communication_preference": profile.communication_preference,
-        "free_text_notes": profile.free_text_notes,
-        "created_at": str(profile.created_at),
-        "provenance": profile.provenance,
-    }
+    prof_dict = _ensure_dict_profile(profile)
+    _validate_profile(prof_dict, slot_id)
+    return prof_dict
 
 
 def initialize_portfolio_registry() -> None:
@@ -88,6 +104,11 @@ def initialize_portfolio_registry() -> None:
                 "horizon": slot["horizon"],
                 "profile": _default_profile_for_slot(slot["id"], slot["name"]),
             }
+        # Validate all on init
+        for sid, sdata in registry.items():
+            if "profile" in sdata:
+                sdata["profile"] = _ensure_dict_profile(sdata["profile"])
+                _validate_profile(sdata["profile"], sid)
         st.session_state["portfolio_behavioral_registry"] = registry
 
     # Ensure current active slot keys exist in session for Friend surfaces
@@ -106,6 +127,8 @@ def initialize_portfolio_registry() -> None:
     if "friend_profile" not in st.session_state:
         # Reconstruct minimal FriendProfile-like for current surfaces
         prof = reg.get("profile", {})
+        prof = _ensure_dict_profile(prof)
+        _validate_profile(prof, active)
         st.session_state["friend_profile"] = create_example_friend_profile(
             profile_id=prof.get("profile_id", f"{active}_friend")
         )
@@ -148,10 +171,8 @@ def write_current_behavioral_to_registry(slot_id: Optional[str] = None) -> None:
     # Store the profile as dict for round-tripping
     current_prof = st.session_state.get("friend_profile")
     if current_prof is not None:
-        if hasattr(current_prof, "to_dict"):
-            reg[slot_id]["profile"] = current_prof.to_dict()
-        elif isinstance(current_prof, dict):
-            reg[slot_id]["profile"] = current_prof
+        current_prof = _ensure_dict_profile(current_prof)
+        reg[slot_id]["profile"] = current_prof
     st.session_state["portfolio_behavioral_registry"] = reg
 
 
