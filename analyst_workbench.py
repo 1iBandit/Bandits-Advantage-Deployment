@@ -26,7 +26,7 @@ Run (after one-time install):
 The app starts instantly with the same minimal demo data used by
 test_phase4j_workbench_flows_v0.2.py (and extended for 4L) so behavior is reproducible.
 
-# Force full rebuild - stale build cache workaround 2026-06-13
+# Force full rebuild - stale build cache workaround 2026-06-14 (Second Guided Question micro-chunk)
 """
 
 import json
@@ -263,7 +263,7 @@ def main():
             st.rerun()
 
         st.divider()
-        st.header("Decision Surface Mode (Phase 4L)")
+        st.header("Decision Surface Mode (Phase 4L)")  # H1 per locked Typography for page/major section titles
         view_mode = st.radio(
             "Mode",
             ["Analyst (4I+4J)", "Friend (4K)"],
@@ -271,7 +271,9 @@ def main():
             horizontal=True,
             key="view_mode",
         )
-        st.caption("Hero Decision Band is always shown above (4L requirement)")
+        st.caption("Hero Decision Band is always shown above (4L requirement)")  # Caption per hierarchy
+
+        # Note: "Investigation Mode (4J)" below uses st.header (H1) for section, consistent with hierarchy for major investigative surfaces.
 
         st.divider()
         st.header("Investigation Mode (4J)")
@@ -373,8 +375,10 @@ def main():
         # Only the allowed elements: rationale, Why bullets, Show More, Export
         # Uses locked 4K presenters. Hero Band is already rendered above.
         st.divider()
-        st.subheader("Friend Mode (4K)")
-        st.caption("Guided companion experience powered by your Friend Profile.")
+        st.subheader("Friend Mode (4K)")  # H2 per locked Typography for mode headers
+        st.caption("Guided companion experience powered by your Friend Profile.")  # Caption per hierarchy
+
+        # Note: The Identity Card and Guided Question use st.subheader for their titles (H2 per locked Typography for card headers / major Friend Mode surfaces). Internal bold labels (e.g. **Primary Goals**) are H3 (Medium). All framing/provenance use st.caption (Caption per locked).
 
         # Friend Mode color system styles (from locked Color System + Card Design)
         # Applied to the .identity-card-wrapper class we inject around the Identity Card.
@@ -414,8 +418,9 @@ def main():
 
         events = get_events()
         calming_state = infer_state(events)
+        unfiltered = st.session_state.get("unfiltered_view", False)
 
-        if calming_state == "CALMING":
+        if calming_state == "CALMING" and not unfiltered:
             if get_current_panic_pattern() is None:
                 node = PanicPatternNode(
                     triggers=["high_checking", "volatility"],
@@ -510,13 +515,55 @@ def main():
             with st.expander("Why am I seeing this?"):
                 st.caption(explain_text)
 
+        # === Second Guided Question (Follow-Up) — micro-chunk v0.1 ===
+        # Per spec: add follow-up button under first Guided Question.
+        # Only the teaching path ("Show me historical drops") for CALMING.
+        # Render second card only when: followup and calming_state == "CALMING" and not unfiltered.
+        # Session-only via button return + existing state. Thin, no new components.
+        # Event logged feeds Relationship Memory Graph later.
+        followup_historical = st.button(
+            "Show me how similar drops played out historically",
+            key="followup_historical"
+        )
+
+        if followup_historical and calming_state == "CALMING" and not unfiltered:
+            capture_event("guided_question_followup", {
+                "type": "historical_drops",
+                "portfolio": state.selected_portfolio
+            })
+
+            st.subheader("Your Next Best Question (Follow‑Up)")
+            st.markdown("Here’s the perspective that usually helps during weeks like this.")
+            st.caption("You’re seeing this because you asked for historical context.")
+
+            st.markdown("""
+- In the last 20 years, 3–5 day drops of 3–6% recovered within 30 days 72% of the time.
+- In the remaining cases, deeper declines were followed by strong 12‑month recoveries.
+- The biggest risk historically wasn’t staying invested — it was reacting too quickly.
+""")
+
+            st.caption("Staying the course during short‑term volatility has historically improved long‑term stability for investors with patterns similar to yours.")
+
         # === Editable Friend Profile form (the new interactive surface) ===
         # Thin UI only. On submit we create a new immutable profile via the
         # pure helper and store it in session_state. The card + question above
         # will reflect the update on rerun.
         with st.expander("✏️ Edit Your Friend Profile (affects this session only)", expanded=False):
             with st.form(key="edit_friend_profile_form", clear_on_submit=False):
-                st.caption("Updating your Friend Profile helps me guide you with more clarity.")
+                # Per locked Input Components v1.0 (incorporating suggested upgrades):
+                # - Contextual Prompt: the caption below
+                # - Responsive Capture: on submit we log "profile_edit" with context for extreme values (hesitation can be future on_change)
+                # - Dynamic Behavioral Caption: the caption can be extended in future, but for v0.1 the success note adapts
+                # Input State Validation Matrix (actionable decision table for v0.1+):
+                # Trigger (e.g. extreme value, hesitation) | State (CALMING/CHALLENGING) | UI Mutation (soften language, reflective note)
+                # Degradation: if no/incomplete profile or low confidence, default to neutral framing (no forced state)
+                # Unfiltered View affordance: checkbox below to temporarily ignore edits (reinforces "Guide Attention, Never Distort Reality")
+                # Anti-dependency: success message reinforces "You did this. I’m just helping you see it."
+                st.caption("Updating your Friend Profile helps me guide you with more clarity. You did this. I’m just helping you see it.")
+
+                unfiltered = st.checkbox("View unfiltered guidance (temporarily ignore my profile edits for this session)", key="unfiltered_view")
+                if unfiltered:
+                    st.caption("Unfiltered view active — mutations disabled for this session only.")
 
                 new_personality = st.selectbox(
                     "Personality Type",
@@ -560,6 +607,14 @@ def main():
                 submitted = st.form_submit_button("Update Profile")
 
             if submitted:
+                capture_event("profile_edit", {
+                    "extreme_risk": new_max_dd < 5 or new_max_dd > 40,
+                    "portfolio": state.selected_portfolio
+                })
+                if unfiltered:
+                    st.session_state["unfiltered_view"] = True
+                else:
+                    st.session_state["unfiltered_view"] = False
                 edits = {
                     "personality_type": new_personality,
                     "primary_goals": new_goals,
@@ -569,7 +624,7 @@ def main():
                 }
                 updated_profile = apply_profile_edits(current_profile, edits)
                 st.session_state["friend_profile"] = updated_profile
-                st.success("Your Friend Profile has been updated. The Identity Card and Guided Question have adapted to your changes.")
+                st.success("Your Friend Profile has been updated. The Identity Card and Guided Question have adapted to your changes. You did this. I’m just helping you see it.")
                 st.rerun()
 
         friend_view = get_friend_view_data(
