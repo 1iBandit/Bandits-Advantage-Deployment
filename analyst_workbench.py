@@ -415,6 +415,7 @@ def main():
 
     if is_unfiltered:
         # Governance override always wins (hard collapse to baseline)
+        st.session_state["behavioral_state"] = "NEUTRAL"
         hero_title = f" DECISION: {base_decision}"
         hero_body = base_body
         status_badge = "STATUS: UNFILTERED DIRECT ACCESS"
@@ -440,6 +441,16 @@ your core capital remains entirely insulated from short-term market variance.
 Our pre-calculated defense plan is actively executing. No structural changes are required today.
 """
         status_badge = "STATUS: ACTIVE DEFENSE"
+    elif active_state == "REINFORCING":
+        # REINFORCING posture (v0.1)
+        hero_title = " POSTURE: PROGRESS CONSOLIDATED"
+        hero_body = """
+Your recent decisions align with the long-term stability parameters in this portfolio.
+Momentum is being preserved through your deliberate tracking choices.
+
+No adjustments are currently required. Stay with your existing plan and cadence.
+"""
+        status_badge = "STATUS: REINFORCING ALIGNMENT"
     else:
         # Neutral baseline
         hero_title = f" DECISION: {base_decision}"
@@ -447,12 +458,16 @@ Our pre-calculated defense plan is actively executing. No structural changes are
         status_badge = base_status
 
     # Render the (possibly mutated) posture header for behavioral states
-    if active_state in ("CALMING", "CHALLENGING") and not is_unfiltered:
+    if active_state in ("CALMING", "CHALLENGING", "REINFORCING") and not is_unfiltered:
         st.markdown("### ⚡ Current Posture")
         st.markdown(f"## {hero_title}")
         st.markdown(hero_body)
+        if active_state == "REINFORCING":
+            timeline = "12-Week Tactical Progress Review"
+        else:
+            timeline = "12-Month Marathon"
         st.caption(
-            "**Timeline Framework:** 12-Month Marathon | "
+            f"**Timeline Framework:** {timeline} | "
             f"**System State:** {status_badge} | "
             "**Tracking Mode:** Session-Bound"
         )
@@ -594,6 +609,15 @@ Our pre-calculated defense plan is actively executing. No structural changes are
             write_current_behavioral_to_registry(get_active_slot_id())
             st.rerun()
 
+        # Simulate Reinforcing Pattern for REINFORCING state (v0.1)
+        if st.button("Simulate Reinforcing Pattern", key="btn_simulate_reinforcing"):
+            st.session_state["behavioral_state"] = "REINFORCING"
+            capture_event("reinforcement_event", {
+                "portfolio": state.selected_portfolio
+            })
+            write_current_behavioral_to_registry(get_active_slot_id())
+            st.rerun()
+
         events = get_events()
         calming_state = infer_state(events)
         unfiltered = st.session_state.get("unfiltered_view", False)
@@ -670,78 +694,6 @@ Our pre-calculated defense plan is actively executing. No structural changes are
             st.caption("This is the first visible expression of your Friend Profile.")
 
             st.markdown('</div>', unsafe_allow_html=True)
-
-        # === Manual Ledger (Sandbox) — v0.3 Buddy Sandbox & Variable Lookback ===
-        # Canonical testing Buddy 1i_Bandit with fixed Dec 2025 ledger.
-        # Placed below Identity Card per spec. Independent of Portfolio Router slots.
-        # Horizon label driven by behavioral_state (CALMING/CHALLENGING/REINFORCING/NEUTRAL).
-        if "buddy_id" not in st.session_state:
-            st.session_state["buddy_id"] = "1i_Bandit"
-        if "sandbox_ledger" not in st.session_state:
-            st.session_state["sandbox_ledger"] = {
-                "TSNF":  {"shares": 760,  "price": 42.50, "date": "2025-11"},
-                "IFRA":  {"shares": 211,  "price": 38.20, "date": "2025-08"},
-                "VALE":  {"shares": 1100, "price": 12.10, "date": "2025-05"},
-                "PL":    {"shares": 250,  "price": 18.45, "date": "2025-10"},
-                "NEE":   {"shares": 150,  "price": 72.30, "date": "2025-09"},
-                "DOCN":  {"shares": 125,  "price": 34.00, "date": "2025-06"},
-                "PBR.A": {"shares": 400,  "price": 14.80, "date": "2025-07"},
-                "IGF":   {"shares": 350,  "price": 45.15, "date": "2025-04"},
-                "PLUG":  {"shares": 140,  "price": 3.20,  "date": "2025-12"},
-            }
-
-        active_state = st.session_state.get("behavioral_state", "NEUTRAL")
-        ledger = st.session_state["sandbox_ledger"]
-
-        # State-driven lookback horizon label (per v0.3 spec)
-        if active_state == "CALMING":
-            horizon_label = "12-Month Strategic Marathon"
-            horizon_note = "Focusing your lens out to 1 year to dilute short-term price noise."
-        elif active_state == "CHALLENGING":
-            horizon_label = "3-Year Historical Macro Cycle"
-            horizon_note = "Anchoring metrics to multi-year history to contextualize current peaks."
-        elif active_state == "REINFORCING":
-            horizon_label = "12-Week Tactical Progress Review"
-            horizon_note = "Highlighting your recent window of disciplined execution."
-        else:
-            horizon_label = "6-Month Balanced Track"
-            horizon_note = "Standard baseline timeframe view."
-
-        st.markdown("---")
-        with st.container():
-            st.subheader(" Manual Ledger (Sandbox)")
-            st.caption(f"Buddy: 1i_Bandit | Snapshot base: December 2025. This is a deterministic testing environment with manual upkeep only.")
-            st.markdown(f"**Current View Window:** `{horizon_label}`")
-            st.caption(f"Companion choice: {horizon_note}")
-
-            for ticker, data in ledger.items():
-                st.text(
-                    f" {ticker.ljust(6)} | Shares: {str(data['shares']).ljust(5)} "
-                    f"| Approx Entry: ${data['price']:.2f} | Captured: {data['date']}"
-                )
-
-            with st.expander("✏️ Update Manual Ledger Entries (Self-Maintained Anchor)"):
-                with st.form("manual_ledger_form"):
-                    target_ticker = st.selectbox("Select asset to modify", options=list(ledger.keys()))
-                    new_shares = st.number_input(
-                        "Current number of shares",
-                        value=int(ledger[target_ticker]["shares"])
-                    )
-                    new_price = st.number_input(
-                        "Approximate purchase price ($)",
-                        value=float(ledger[target_ticker]["price"])
-                    )
-
-                    if st.form_submit_button("Commit manual update"):
-                        st.session_state["sandbox_ledger"][target_ticker]["shares"] = new_shares
-                        st.session_state["sandbox_ledger"][target_ticker]["price"] = new_price
-                        # Write to behavioral registry for the sandbox (independent but tracked)
-                        write_current_behavioral_to_registry(get_active_slot_id())
-                        st.success(
-                            f"Ledger entry for {target_ticker} updated in session. "
-                            "Identity alignment preserved."
-                        )
-                        st.rerun()
 
         # === First Guided Question ===
         # Now reacts to the live-edited profile.
@@ -881,6 +833,77 @@ Our pre-calculated defense plan is actively executing. No structural changes are
                 write_current_behavioral_to_registry(get_active_slot_id())
                 st.success("Your Friend Profile has been updated. The Identity Card and Guided Question have adapted to your changes. You did this. I’m just helping you see it.")
                 st.rerun()
+
+        # === Manual Ledger (Sandbox) — v0.3 Buddy Sandbox & Variable Lookback ===
+        # Canonical testing Buddy 1i_Bandit with fixed Dec 2025 ledger.
+        # Placed below Identity Card / editable surfaces, above Memory Graph Viewer per spec.
+        # Independent of Portfolio Router slots.
+        # Horizon label driven by behavioral_state (CALMING/CHALLENGING/REINFORCING/NEUTRAL).
+        if "buddy_id" not in st.session_state:
+            st.session_state["buddy_id"] = "1i_Bandit"
+        if "sandbox_ledger" not in st.session_state:
+            st.session_state["sandbox_ledger"] = {
+                "TSNF":  {"shares": 760,  "price": 42.50, "date": "2025-11"},
+                "IFRA":  {"shares": 211,  "price": 38.20, "date": "2025-08"},
+                "VALE":  {"shares": 1100, "price": 12.10, "date": "2025-05"},
+                "PL":    {"shares": 250,  "price": 18.45, "date": "2025-10"},
+                "NEE":   {"shares": 150,  "price": 72.30, "date": "2025-09"},
+                "DOCN":  {"shares": 125,  "price": 34.00, "date": "2025-06"},
+                "PBR.A": {"shares": 400,  "price": 14.80, "date": "2025-07"},
+                "IGF":   {"shares": 350,  "price": 45.15, "date": "2025-04"},
+                "PLUG":  {"shares": 140,  "price": 3.20,  "date": "2025-12"},
+            }
+
+        active_state = st.session_state.get("behavioral_state", "NEUTRAL")
+        ledger = st.session_state["sandbox_ledger"]
+
+        # State-driven lookback horizon label (per v0.3 spec)
+        if active_state == "CALMING":
+            horizon_label = "12-Month Strategic Marathon"
+            horizon_note = "Focusing your lens out to 1 year to dilute short-term price noise."
+        elif active_state == "CHALLENGING":
+            horizon_label = "3-Year Historical Macro Cycle"
+            horizon_note = "Anchoring metrics to multi-year history to contextualize current peaks."
+        elif active_state == "REINFORCING":
+            horizon_label = "12-Week Tactical Progress Review"
+            horizon_note = "Highlighting your recent window of disciplined execution."
+        else:
+            horizon_label = "6-Month Balanced Track"
+            horizon_note = "Standard baseline timeframe view."
+
+        st.markdown("---")
+        with st.container():
+            st.subheader(" Manual Ledger (Sandbox)")
+            st.caption(f"Buddy: 1i_Bandit | Snapshot Base: December 2025. This is a deterministic testing environment with manual upkeep only.")
+            st.markdown(f"**Current View Window:** `{horizon_label}`")
+            st.caption(f" Companion choice: {horizon_note}")
+
+            for ticker, data in ledger.items():
+                st.text(
+                    f" {ticker.ljust(6)} | Shares: {str(data['shares']).ljust(5)} "
+                    f"| Approx Entry: ${data['price']:.2f} | Captured: {data['date']}"
+                )
+
+            with st.expander("✏️ Update Manual Ledger Entries (Self-Maintained Anchor)"):
+                with st.form("manual_ledger_form"):
+                    target_ticker = st.selectbox("Select asset to modify", options=list(ledger.keys()))
+                    new_shares = st.number_input(
+                        "Current number of shares",
+                        value=int(ledger[target_ticker]["shares"])
+                    )
+                    new_price = st.number_input(
+                        "Approximate purchase price ($)",
+                        value=float(ledger[target_ticker]["price"])
+                    )
+
+                    if st.form_submit_button("Commit manual update"):
+                        st.session_state["sandbox_ledger"][target_ticker]["shares"] = new_shares
+                        st.session_state["sandbox_ledger"][target_ticker]["price"] = new_price
+                        st.success(
+                            f"Ledger entry for {target_ticker} updated in session. "
+                            "Identity alignment preserved."
+                        )
+                        st.rerun()
 
         # === RELATIONSHIP MEMORY GRAPH VIEWER (v0.1) ===
         # Thin, session-only, read-only audit surface per the Relationship Memory Graph Viewer micro-chunk.
