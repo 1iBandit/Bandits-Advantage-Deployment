@@ -21,6 +21,13 @@ from typing import Any, Dict, List, Optional, Set
 
 # FriendProfile for active guide (imported here for thin presenters only)
 from .friend_profile import FriendProfile, create_example_friend_profile
+from .behavior import (
+    capture_event,
+    get_events,
+    add_panic_pattern,
+    PanicPatternNode,
+    infer_state,
+)
 
 # =============================================================================
 # Canonical Narrative Taxonomy (LOCKED ENUM – no free-text drift)

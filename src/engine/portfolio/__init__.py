@@ -74,6 +74,15 @@ from .friend_profile import (
     create_example_friend_profile,
     apply_profile_edits,
 )
+from .behavior import (
+    BehavioralEvent,
+    capture_event,
+    get_events,
+    PanicPatternNode,
+    add_panic_pattern,
+    get_current_panic_pattern,
+    infer_state,
+)
 
 __all__ = [
     "save_snapshot",
@@ -130,4 +139,12 @@ __all__ = [
     "FriendProfile",
     "create_example_friend_profile",
     "apply_profile_edits",
+    # Behavior (Interactive Core Engine v0.1 – CALMING micro-chunk)
+    "BehavioralEvent",
+    "capture_event",
+    "get_events",
+    "PanicPatternNode",
+    "add_panic_pattern",
+    "get_current_panic_pattern",
+    "infer_state",
 ]

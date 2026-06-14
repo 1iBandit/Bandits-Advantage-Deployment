@@ -67,6 +67,14 @@ from src.engine.portfolio.friend_profile import (
     create_example_friend_profile,
     apply_profile_edits,
 )
+from src.engine.portfolio.behavior import (
+    capture_event,
+    get_events,
+    add_panic_pattern,
+    PanicPatternNode,
+    get_current_panic_pattern,
+    infer_state,
+)
 from src.engine.portfolio.workbench_ui import (
     WorkbenchSessionState,
     render_full_workbench_with_flows,
@@ -395,70 +403,57 @@ def main():
 
         current_profile: FriendProfile = st.session_state["friend_profile"]
 
-        # === Temporary verification patch: bright border + tint on the Identity Card
-        # so we can instantly see whether the latest canonical code is live after
-        # sync + redeploy. (Remove once we confirm the pipeline is healthy.)
-        # TEMP diagnostic: Find bordered containers and the one containing "Identity Card"
-        # Dumps data-testid, style, class, and outerHTML for the relevant wrappers.
-        # Look for the bordered div that wraps the "Identity Card" content.
-        import streamlit.components.v1 as components
-        components.html(
-            """
-            <script>
-            // Find all bordered containers (the ones with inline border style)
-            const bordered = document.querySelectorAll('div[style*="border"]');
-            let out = ['=== Bordered Containers (likely cards) ==='];
-            bordered.forEach((b, i) => {
-                const testid = b.getAttribute('data-testid') || '';
-                const style = b.getAttribute('style') || '';
-                const cls = b.className || '';
-                const text = b.innerText ? b.innerText.substring(0, 100) : '';
-                out.push(`Bordered #${i}: data-testid="${testid}" | style="${style.substring(0,200)}" | class="${cls}"`);
-                out.push(`  Contains text: "${text}"...`);
-                out.push(`  outerHTML: ${b.outerHTML.substring(0, 400)}...`);
-            });
+        # Capture load event for the Behavioral Event Stream
+        capture_event("portfolio_check", {"portfolio": state.selected_portfolio})
 
-            // Also find the ancestor chain for "Identity Card" text
-            out.push('\\n=== Ancestor chain for "Identity Card" text ===');
-            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-            let target = null;
-            let node;
-            while (node = walker.nextNode()) {
-                if (node.nodeValue.includes('Identity Card')) {
-                    target = node.parentElement;
-                    break;
-                }
-            }
-            if (target) {
-                let current = target;
-                let depth = 0;
-                while (current && depth < 6) {
-                    const tag = current.tagName;
-                    const testid = current.getAttribute('data-testid') || '';
-                    const style = current.getAttribute('style') || '';
-                    const cls = current.className || '';
-                    out.push(`Depth ${depth}: ${tag} | data-testid="${testid}" | style="${style.substring(0,150)}" | class="${cls}"`);
-                    out.push(`  outerHTML: ${current.outerHTML.substring(0, 300)}...`);
-                    current = current.parentElement;
-                    depth++;
-                }
-            } else {
-                out.push("Could not find 'Identity Card' text in DOM");
-            }
+        # Demo button to simulate the panic pattern (high checking + projection + hover)
+        if st.button("Simulate panic pattern (high checking + hover for demo)", key="btn_simulate_panic"):
+            capture_event("projection_view", {"portfolio": state.selected_portfolio})
+            capture_event("hover_sell", {"portfolio": state.selected_portfolio})
+            st.rerun()
 
-            const pre = document.createElement('pre');
-            pre.innerText = out.join("\\n");
-            document.body.appendChild(pre);
-            </script>
-            """,
-            height=800,
-        )
+        events = get_events()
+        calming_state = infer_state(events)
+
+        if calming_state == "CALMING":
+            if get_current_panic_pattern() is None:
+                node = PanicPatternNode(
+                    triggers=["high_checking", "volatility"],
+                    behaviors=["portfolio_check", "projection_view", "hover_sell"],
+                    emotional_inference="anxiety_spike",
+                    stabilization_response="calming_flow_v0",
+                    outcome="no_panic_sale",
+                )
+                add_panic_pattern(node)
+
+            continuity_header = "This week’s volatility is similar to periods you’ve found stressful before. Let’s focus on stability."
+            hero_framing = "Given your discomfort with drawdowns above 15%, I’m prioritizing stability over action today."
+            identity_framing = "I'm guiding you as a BalancedCore investor, with extra focus on protecting your comfort zone during volatility."
+            guided_question = "What would help you feel safe staying the course here?"
+            guided_rationale = "Avoiding panic-selling during periods like this has historically improved long-term stability for investors like you."
+            explain_text = "You’ve been checking short-term changes more frequently today, so I’m foregrounding stability and long-term context. All of your usual details are still available below."
+        else:
+            continuity_header = None
+            hero_framing = None
+            identity_framing = None
+            guided_question = None
+            guided_rationale = None
+            explain_text = None
+
+        if continuity_header:
+            st.caption(continuity_header)
+
+        if hero_framing:
+            st.caption(hero_framing)
 
         # === Friend Mode Identity Card ===
         # Now passes the (potentially edited) profile so it reflects user input.
         identity_card = get_friend_identity_card_data(
             state.selected_portfolio, registry, friend_profile=current_profile
         )
+
+        if identity_framing:
+            identity_card["framing"] = identity_framing
 
         # Guaranteed wrapper for styling — Streamlit cannot optimize this away
         # (replaces border=True which was being collapsed)
@@ -497,6 +492,11 @@ def main():
             state.selected_portfolio, registry, lifecycles, snapshot, friend_profile=current_profile
         )
 
+        if guided_question:
+            guided["question"] = guided_question
+        if guided_rationale:
+            guided["rationale"] = guided_rationale
+
         with st.container(border=True):
             st.subheader("Guided Question")
             st.markdown(f"> {guided.get('question', '')}")
@@ -505,6 +505,10 @@ def main():
             if signals:
                 st.caption("Drawn from: " + ", ".join(signals))
             st.caption("This is the kind of question I will proactively bring forward for you.")
+
+        if explain_text:
+            with st.expander("Why am I seeing this?"):
+                st.caption(explain_text)
 
         # === Editable Friend Profile form (the new interactive surface) ===
         # Thin UI only. On submit we create a new immutable profile via the
