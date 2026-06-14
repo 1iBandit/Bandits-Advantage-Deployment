@@ -2010,7 +2010,7 @@ def get_friend_identity_card_data(
     tendencies = friend_profile.behavioral_tendencies or ["None flagged yet"]
 
     framing = (
-        f"I'm guiding you as a {friend_profile.personality_type.lower()} investor. "
+        f"I'm guiding you as a {friend_profile.personality_type} investor. "
         f"I will respect your goals, stay within your caps, and watch for the tendencies "
         f"you've shared with me."
     )
@@ -2081,7 +2081,7 @@ def get_first_guided_question(
             "have you considered whether this strength is sustainable or if it's time to stress-test the assumptions behind it?"
         )
         rationale = (
-            f"Because your FriendProfile flags recency_bias and your current lifecycles show STRENGTHENING signals, "
+            f"Because your Friend Profile flags recency_bias and your current lifecycles show STRENGTHENING signals, "
             f"this is the question that can build long-term resilience for a {friend_profile.personality_type} investor."
         )
         signals = ["behavioral_tendencies.recency_bias", "lifecycle.strengthen"]

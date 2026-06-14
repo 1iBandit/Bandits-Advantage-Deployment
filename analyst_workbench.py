@@ -365,8 +365,8 @@ def main():
         # Only the allowed elements: rationale, Why bullets, Show More, Export
         # Uses locked 4K presenters. Hero Band is already rendered above.
         st.divider()
-        st.subheader("Friend Mode (4K) – Safe Translation Layer")
-        st.caption(f"friend_language_version = {FRIEND_LANGUAGE_VERSION} | Pure presenter: get_friend_view_data")
+        st.subheader("Friend Mode (4K)")
+        st.caption("Guided companion experience powered by your Friend Profile.")
 
         # === Session-level editable FriendProfile (new in this micro-chunk) ===
         # The user now has agency: edit the profile and immediately see the
