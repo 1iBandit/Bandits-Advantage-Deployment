@@ -26,7 +26,7 @@ Run (after one-time install):
 The app starts instantly with the same minimal demo data used by
 test_phase4j_workbench_flows_v0.2.py (and extended for 4L) so behavior is reproducible.
 
-# Force full rebuild - stale build cache workaround 2026-06-14 (Hero Band Context Awareness v0.1)
+# Force full rebuild - stale build cache workaround 2026-06-14 (Hero Band CHALLENGING v0.1 extension)
 """
 
 import json
@@ -74,6 +74,18 @@ from src.engine.portfolio.behavior import (
     PanicPatternNode,
     get_current_panic_pattern,
     infer_state,
+    # v0.2 Portfolio Router
+    initialize_portfolio_registry,
+    get_active_slot_id,
+    get_slot_display_name,
+    get_slot_index,
+    get_total_slots,
+    write_current_behavioral_to_registry,
+    restore_behavioral_from_registry,
+    switch_to_slot,
+    get_portfolio_summary_for_active,
+    export_registry_as_json,
+    force_neutral_all_slots,
 )
 from src.engine.portfolio.workbench_ui import (
     WorkbenchSessionState,
@@ -232,6 +244,9 @@ def main():
         st.session_state.demo_data = setup_demo_data()
         st.session_state.last_exported_note = None
 
+    # v0.2 Portfolio Router: initialize isolated behavioral containers (session-only)
+    initialize_portfolio_registry()
+
     state: WorkbenchSessionState = st.session_state.wb_state
     demo: Dict[str, Any] = st.session_state.demo_data
 
@@ -239,8 +254,9 @@ def main():
     with st.sidebar:
         st.header("Portfolio & Time")
 
-        portfolio_options = ["P001_GROWTH", "P002_PRESERVATION"]
-        current_idx = 0 if state.selected_portfolio == "P001_GROWTH" else 1
+        # v0.2: Extended to 3 slots for behavioral isolation demo (1/3 in header)
+        portfolio_options = ["P001_GROWTH", "P002_PRESERVATION", "P003_INCOME"]
+        current_idx = portfolio_options.index(state.selected_portfolio) if state.selected_portfolio in portfolio_options else 0
         new_portfolio = st.selectbox(
             "Active Portfolio",
             portfolio_options,
@@ -248,8 +264,12 @@ def main():
             key="sb_portfolio",
         )
         if new_portfolio != state.selected_portfolio:
+            # Write current behavioral context back, switch slot (full teardown + restore)
+            write_current_behavioral_to_registry(state.selected_portfolio)
             select_portfolio(state, new_portfolio)
-            st.rerun()
+            # Router handles behavioral isolation switch
+            switch_to_slot(new_portfolio)
+            # Note: switch_to_slot does st.rerun() internally for full surface teardown
 
         time_window = st.radio(
             "Temporal Window (4J Progressive Disclosure)",
@@ -341,8 +361,31 @@ def main():
         st.caption("Session state is **not** persisted across browser restarts.\n"
                    "Use Export Investigation Note to capture it.")
 
+        # v0.2: Optional export of the isolated behavioral registry (Buddy states)
+        if st.button("Export Buddy States (Portfolio Router v0.2)", key="btn_export_buddy_registry"):
+            json_data = export_registry_as_json()
+            st.download_button(
+                label="Download buddy_registry.json",
+                data=json_data,
+                file_name="buddy_registry_v0.2.json",
+                mime="application/json",
+            )
+            st.success("Exported full per-portfolio behavioral containers (session-only).")
+
     # --- Main area ---
     registry, lifecycles, snapshot, ledger, base_weekly = get_current_objects(demo, state.selected_portfolio)
+
+    # === v0.2 Portfolio Summary (lightweight context above Hero Band in Friend Mode) ===
+    mode_for_summary = st.session_state.get("view_mode", "Analyst (4I+4J)")
+    if "Friend" in mode_for_summary:
+        summary = get_portfolio_summary_for_active()
+        slot_id = get_active_slot_id()
+        idx = get_slot_index(slot_id)
+        total = get_total_slots()
+        st.caption(
+            f"**{summary['name']}**  •  {summary['horizon']}  •  Max Drawdown: {summary['max_dd']}  "
+            f"({idx}/{total})"
+        )
 
     # === Phase 4L Hero Decision Band (dominant, always visible, mode-independent) ===
     # All data from get_hero_decision_band_data (thin presenter in narrative.py)
@@ -473,6 +516,31 @@ Our pre-calculated defense plan is actively executing. No structural changes are
         st.subheader("Friend Mode (4K)")  # H2 per locked Typography for mode headers
         st.caption("Guided companion experience powered by your Friend Profile.")  # Caption per hierarchy
 
+        # === v0.2 Continuity Header with Portfolio Router (Surface 1) ===
+        active_slot = get_active_slot_id()
+        display_name = get_slot_display_name(active_slot)
+        idx = get_slot_index(active_slot)
+        total = get_total_slots()
+        st.markdown(
+            f"**Buddy: David** | Active: **{display_name} ({idx}/{total})**"
+        )
+        # Lightweight switch affordance (full isolation + teardown on change)
+        # The sidebar also has the selector; this header makes the behavioral context the north star.
+        slot_options = list(st.session_state.get("portfolio_behavioral_registry", {}).keys())
+        current_slot_idx = slot_options.index(active_slot) if active_slot in slot_options else 0
+        new_slot = st.selectbox(
+            "Switch Portfolio (behavioral context)",
+            slot_options,
+            index=current_slot_idx,
+            key="friend_portfolio_selector",
+        )
+        if new_slot != active_slot:
+            write_current_behavioral_to_registry(active_slot)
+            # Keep analytical data in sync with the behavioral slot (for Hero Band + data surfaces)
+            if new_slot != state.selected_portfolio:
+                select_portfolio(state, new_slot)
+            switch_to_slot(new_slot)
+
         # Note: The Identity Card and Guided Question use st.subheader for their titles (H2 per locked Typography for card headers / major Friend Mode surfaces). Internal bold labels (e.g. **Primary Goals**) are H3 (Medium). All framing/provenance use st.caption (Caption per locked).
 
         # Friend Mode color system styles (from locked Color System + Card Design)
@@ -510,6 +578,7 @@ Our pre-calculated defense plan is actively executing. No structural changes are
             capture_event("projection_view", {"portfolio": state.selected_portfolio})
             capture_event("hover_sell", {"portfolio": state.selected_portfolio})
             st.session_state["behavioral_state"] = "CALMING"
+            write_current_behavioral_to_registry(get_active_slot_id())
             st.rerun()
 
         # New: Simulate Euphoria / Overconfidence pattern for CHALLENGING (Hero Band Context Awareness v0.1 extension)
@@ -522,6 +591,7 @@ Our pre-calculated defense plan is actively executing. No structural changes are
                     "bypassed_standard_diversification_guidelines",
                 ],
             })
+            write_current_behavioral_to_registry(get_active_slot_id())
             st.rerun()
 
         events = get_events()
@@ -573,8 +643,10 @@ Our pre-calculated defense plan is actively executing. No structural changes are
         identity_card_wrapper = st.container()
         with identity_card_wrapper:
             st.markdown('<div class="identity-card-wrapper">', unsafe_allow_html=True)
+            # v0.2: Identity Card now reflects the active portfolio's context (name + constraints from profile)
+            active_slot_name = get_slot_display_name(get_active_slot_id())
             st.subheader("️ Identity Card")
-            st.caption(identity_card.get("framing", ""))
+            st.caption(f"**{active_slot_name}** — {identity_card.get('framing', '')}")
 
             c1, c2, c3 = st.columns(3)
             with c1:
@@ -721,6 +793,7 @@ Our pre-calculated defense plan is actively executing. No structural changes are
                 })
                 if unfiltered:
                     st.session_state["unfiltered_view"] = True
+                    force_neutral_all_slots()
                 else:
                     st.session_state["unfiltered_view"] = False
                 edits = {
@@ -732,6 +805,8 @@ Our pre-calculated defense plan is actively executing. No structural changes are
                 }
                 updated_profile = apply_profile_edits(current_profile, edits)
                 st.session_state["friend_profile"] = updated_profile
+                # v0.2 write-back after profile mutation
+                write_current_behavioral_to_registry(get_active_slot_id())
                 st.success("Your Friend Profile has been updated. The Identity Card and Guided Question have adapted to your changes. You did this. I’m just helping you see it.")
                 st.rerun()
 
@@ -751,6 +826,7 @@ Our pre-calculated defense plan is actively executing. No structural changes are
             st.subheader("What I'm Remembering This Session")
 
             if is_unfiltered:
+                force_neutral_all_slots()
                 st.caption("Memory-assisted guidance is currently deactivated for this session via your Unfiltered View override toggle.")
                 # Do not render any event details when governance override is active
             else:
@@ -806,6 +882,7 @@ Our pre-calculated defense plan is actively executing. No structural changes are
                                 st.session_state["behavioral_events"] = []
                                 st.session_state["panic_pattern_nodes"] = []
                                 st.session_state["behavioral_state"] = "NEUTRAL"
+                                write_current_behavioral_to_registry(get_active_slot_id())
                                 st.session_state["confirm_purge"] = False
                                 st.success("Session memory dropped cleanly. Starting fresh.")
                                 st.rerun()
