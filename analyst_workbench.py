@@ -26,7 +26,7 @@ Run (after one-time install):
 The app starts instantly with the same minimal demo data used by
 test_phase4j_workbench_flows_v0.2.py (and extended for 4L) so behavior is reproducible.
 
-# Force full rebuild - stale build cache workaround 2026-06-14 (Second Guided Question micro-chunk)
+# Force full rebuild - stale build cache workaround 2026-06-14 (Hero Band Context Awareness v0.1)
 """
 
 import json
@@ -284,6 +284,8 @@ def main():
                 st.session_state["friend_profile"] = create_example_friend_profile(
                     profile_id=f"{state.selected_portfolio}_friend"
                 )
+            if "behavioral_state" not in st.session_state:
+                st.session_state["behavioral_state"] = "NEUTRAL"
 
         # Note: "Investigation Mode (4J)" below uses st.header (H1) for section, consistent with hierarchy for major investigative surfaces.
 
@@ -344,8 +346,8 @@ def main():
 
     # === Phase 4L Hero Decision Band (dominant, always visible, mode-independent) ===
     # All data from get_hero_decision_band_data (thin presenter in narrative.py)
-    # Hero Band Context Awareness v0.1: linguistic posture mutates on CALMING from Relationship Memory Graph.
-    # Core analytical recommendation + metrics remain immutable (no calculation distortion).
+    # Hero Band Context Awareness v0.1 extension: explicit behavioral_state (CALMING / CHALLENGING / NEUTRAL)
+    # Linguistic/postural mutation only. Core data + metrics never altered.
     hero = get_hero_decision_band_data(
         state.selected_portfolio, registry, lifecycles, snapshot
     )
@@ -353,42 +355,71 @@ def main():
     rec = hero["primary_recommendation"]
     is_abstain = hero.get("is_abstaining", False)
 
-    # Context Awareness inputs (thin, from session / Memory Graph)
-    # Profile guaranteed by early init when in Friend mode; events populated by simulate.
-    mode_now = st.session_state.get("view_mode", "Analyst (4I+4J)")
-    is_friend = "Friend" in mode_now
-    calming_state = None
-    try:
-        evs = get_events()
-        calming_state = infer_state(evs)
-    except Exception:
-        pass
+    # === Hero Band routing logic per spec (prefers explicit behavioral_state) ===
+    active_state = st.session_state.get("behavioral_state", "NEUTRAL")
     is_unfiltered = st.session_state.get("unfiltered_view", False)
     current_profile = st.session_state.get("friend_profile")
     max_dd = 15.0
     if current_profile and hasattr(current_profile, "risk_constraints"):
         max_dd = current_profile.risk_constraints.get("max_drawdown_pct", 15.0)
 
-    if is_friend and calming_state == "CALMING" and not is_unfiltered:
-        # CALMING intercept — elevate behavioral posture to top of stack (spec v0.1)
-        # Time-horizon anchoring + risk framing from profile. Agency preserved.
+    mode_now = st.session_state.get("view_mode", "Analyst (4I+4J)")
+    is_friend = "Friend" in mode_now
+
+    base_decision = "OBSERVE (ABSTAIN)"
+    base_body = "Market conditions do not meet your risk posture right now."
+    base_status = "STATUS: STANDARD TRACKING"
+
+    if is_unfiltered:
+        # Governance override always wins (hard collapse to baseline)
+        hero_title = f" DECISION: {base_decision}"
+        hero_body = base_body
+        status_badge = "STATUS: UNFILTERED DIRECT ACCESS"
+    elif active_state == "CHALLENGING":
+        # New CHALLENGING posture (euphoria / overconfidence at peaks)
+        # Higher-risk state takes precedence over CALMING per v0.1 decision
+        hero_title = "⚠️ POSTURE: RISK VELOCITY ALERT"
+        hero_body = """
+Current momentum appears increasingly disconnected from core valuation health.
+
+Given your active profile constraints and the recent market expansion,
+we are maintaining our strict asset allocation caps. No incremental capital
+deployment is recommended at current valuation peaks.
+"""
+        status_badge = "STATUS: TRANSITION PAUSE"
+    elif active_state == "CALMING" and is_friend:
+        # Existing CALMING logic (preserved)
+        hero_title = " POSTURE: INSULATED & PROTECTED"
+        hero_body = f"""
+Given your **12-Month Strategic Horizon** and documented comfort zone (**max drawdown: {max_dd}%**), 
+your core capital remains entirely insulated from short-term market variance. 
+
+Our pre-calculated defense plan is actively executing. No structural changes are required today.
+"""
+        status_badge = "STATUS: ACTIVE DEFENSE"
+    else:
+        # Neutral baseline
+        hero_title = f" DECISION: {base_decision}"
+        hero_body = base_body
+        status_badge = base_status
+
+    # Render the (possibly mutated) posture header for behavioral states
+    if active_state in ("CALMING", "CHALLENGING") and not is_unfiltered:
         st.markdown("### ⚡ Current Posture")
-        st.markdown("##  POSTURE: INSULATED & PROTECTED")
-        st.markdown(f"""
-        Given your **12-Month Strategic Horizon** and documented comfort zone (**max drawdown: {max_dd}%**), 
-        your core capital remains entirely insulated from short-term market variance. 
+        st.markdown(f"## {hero_title}")
+        st.markdown(hero_body)
+        st.caption(
+            "**Timeline Framework:** 12-Month Marathon | "
+            f"**System State:** {status_badge} | "
+            "**Tracking Mode:** Session-Bound"
+        )
 
-        Our pre-calculated defense plan is actively executing. No structural changes are required today.
-        """)
-        st.caption("**Timeline Framework:** 12-Month Continuous View | **System State:** STATUS: ACTIVE DEFENSE | **Timestamp:** Live via Session Lifecycle")
-
-        # Raw analytical core remains visible (data integrity — never hidden or altered)
+        # Always surface the raw analytical recommendation + metrics underneath (data integrity)
         if is_abstain:
             st.caption(f"Analytical Recommendation (unchanged data): **{rec} (ABSTAIN)**")
         else:
             st.caption(f"Analytical Recommendation (unchanged data): **{rec}**")
 
-        # Metrics (factual layer) still rendered
         band_cols = st.columns(4)
         with band_cols[0]:
             st.metric("Directional Bias", hero.get("directional_bias", "—"))
@@ -402,7 +433,7 @@ def main():
 
         st.caption(f"Hero Band • {state.selected_portfolio} • Phase 4L (Context-Aware)")
     else:
-        # Standard baseline execution frame (or Analyst mode, or unfiltered)
+        # Baseline / unfiltered / Analyst: original factual rendering
         if is_abstain:
             st.error(f"**{rec} (ABSTAIN)**", icon="🛑")
         else:
@@ -478,6 +509,19 @@ def main():
         if st.button("Simulate panic pattern (high checking + hover for demo)", key="btn_simulate_panic"):
             capture_event("projection_view", {"portfolio": state.selected_portfolio})
             capture_event("hover_sell", {"portfolio": state.selected_portfolio})
+            st.session_state["behavioral_state"] = "CALMING"
+            st.rerun()
+
+        # New: Simulate Euphoria / Overconfidence pattern for CHALLENGING (Hero Band Context Awareness v0.1 extension)
+        if st.button("Simulate Euphoria Pattern (rapid allocation at highs)", key="btn_simulate_euphoria"):
+            st.session_state["behavioral_state"] = "CHALLENGING"
+            capture_event("overconfidence_pattern", {
+                "trigger": "rapid_allocation_increase_at_market_highs",
+                "behaviors": [
+                    "increased_growth_allocation_target_by_20pct",
+                    "bypassed_standard_diversification_guidelines",
+                ],
+            })
             st.rerun()
 
         events = get_events()
@@ -761,6 +805,7 @@ def main():
                                 # Nuclear structural purge sequence (session-only)
                                 st.session_state["behavioral_events"] = []
                                 st.session_state["panic_pattern_nodes"] = []
+                                st.session_state["behavioral_state"] = "NEUTRAL"
                                 st.session_state["confirm_purge"] = False
                                 st.success("Session memory dropped cleanly. Starting fresh.")
                                 st.rerun()
