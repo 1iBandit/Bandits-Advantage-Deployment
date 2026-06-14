@@ -266,6 +266,11 @@ def main():
         if new_portfolio != state.selected_portfolio:
             # Write current behavioral context back, switch slot (full teardown + restore)
             write_current_behavioral_to_registry(state.selected_portfolio)
+            if st.session_state.get("behavioral_state") == "NEUTRAL":
+                st.session_state.setdefault("behavior_event_log", []).append({
+                    "category": "Stability Signals",
+                    "description": "Maintained Neutral during portfolio switch"
+                })
             select_portfolio(state, new_portfolio)
             # Router handles behavioral isolation switch
             switch_to_slot(new_portfolio)
@@ -553,6 +558,11 @@ No adjustments are currently required. Stay with your existing plan and cadence.
         )
         if new_slot != active_slot:
             write_current_behavioral_to_registry(active_slot)
+            if st.session_state.get("behavioral_state") == "NEUTRAL":
+                st.session_state.setdefault("behavior_event_log", []).append({
+                    "category": "Stability Signals",
+                    "description": "Maintained Neutral during portfolio switch"
+                })
             # Keep analytical data in sync with the behavioral slot (for Hero Band + data surfaces)
             if new_slot != state.selected_portfolio:
                 select_portfolio(state, new_slot)
@@ -608,6 +618,10 @@ No adjustments are currently required. Stay with your existing plan and cadence.
             )
             if st.button("Continue with this picture", key="liam_cash_continue"):
                 st.session_state["liam_cash_buffer"] = cash_buffer
+                st.session_state.setdefault("behavior_event_log", []).append({
+                    "category": "Attention Patterns",
+                    "description": "Viewed cash buffer in onboarding"
+                })
                 new_state = "TEACHING" if cash_buffer < 1000 else "GROUNDING"
                 advance_liam_step(2, new_state)
 
@@ -627,6 +641,10 @@ No adjustments are currently required. Stay with your existing plan and cadence.
             )
             if st.button("Continue", key="liam_roth_continue"):
                 st.session_state["liam_roth"] = roth_amount
+                st.session_state.setdefault("behavior_event_log", []).append({
+                    "category": "Attention Patterns",
+                    "description": "Viewed existing assets in onboarding"
+                })
                 advance_liam_step(3)
 
         elif liam_step == 3:
@@ -646,6 +664,10 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                 )
             st.caption("This is just perspective to help you choose what matters most right now.")
             if st.button("Got it — let's pick a first step", key="liam_priority_continue"):
+                st.session_state.setdefault("behavior_event_log", []).append({
+                    "category": "Attention Patterns",
+                    "description": "Viewed priority framing in onboarding"
+                })
                 advance_liam_step(4, "TEACHING")
 
         elif liam_step == 4:
@@ -692,6 +714,10 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                     "date": "2026-06"
                 }
                 st.session_state["ledger_update_count"] = st.session_state.get("ledger_update_count", 0) + 1
+                st.session_state.setdefault("behavior_event_log", []).append({
+                    "category": "Manual Bookkeeping",
+                    "description": f"Added CASH entry from Liam onboarding"
+                })
                 st.success(
                     f"Perfect — your ${commit} first commitment is now reflected in the 1i_Bandit sandbox ledger as CASH. "
                     "This is how we practice the habit safely."
@@ -738,6 +764,50 @@ No adjustments are currently required. Stay with your existing plan and cadence.
             st.info("Not support. A direct line to your system mentor for guidance on your financial path. Your request has been noted and David will respond with tailored guidance.")
         st.caption("Not support. A direct line to your system mentor for guidance on your financial path.")
 
+        # === Memory Graph Viewer v0.2 - Sovereign Transparency Deck ===
+        # Added after Sandbox per spec.
+        is_unfiltered = st.session_state.get("unfiltered_view", False)
+        events = st.session_state.get("behavior_event_log", [])
+
+        st.markdown("---")
+        st.subheader(" Memory Graph Viewer — Sovereign Transparency Deck")
+
+        if is_unfiltered:
+            st.info("Memory Viewer Disabled — Unfiltered View is active.")
+            # No events shown, no purge
+        else:
+            st.markdown("**Your Memory, Your Control**")
+            st.caption("This is your session memory. You own it. You can clear it at any time.")
+
+            st.markdown("**Why This Matters**")
+            st.caption("These patterns help your Companion adjust pacing and framing — never your identity.")
+
+            # Group events
+            categories = {
+                "Manual Bookkeeping": [],
+                "Attention Patterns": [],
+                "Stability Signals": [],
+                "Reinforcement Moments": []
+            }
+
+            for e in events:
+                cat = e.get("category", "Attention Patterns")
+                desc = e.get("description", "")
+                if cat in categories:
+                    categories[cat].append(desc)
+
+            for cat, items in categories.items():
+                if items:
+                    st.markdown(f"### {cat}")
+                    for item in items:
+                        st.markdown(f"- {item}")
+
+            st.markdown("---")
+            if st.button("️ Clear My Memory", key="memory_purge"):
+                st.session_state["behavior_event_log"] = []
+                st.success("Your memory has been cleared. You’re in control.")
+                st.rerun()
+
         # Friend Mode color system styles (from locked Color System + Card Design)
         # Applied to the .identity-card-wrapper class we inject around the Identity Card.
         st.markdown("""
@@ -773,6 +843,10 @@ No adjustments are currently required. Stay with your existing plan and cadence.
             capture_event("projection_view", {"portfolio": state.selected_portfolio})
             capture_event("hover_sell", {"portfolio": state.selected_portfolio})
             st.session_state["behavioral_state"] = "CALMING"
+            st.session_state.setdefault("behavior_event_log", []).append({
+                "category": "Stability Signals",
+                "description": "Maintained pacing during CALMING"
+            })
             write_current_behavioral_to_registry(get_active_slot_id())
             st.rerun()
 
@@ -786,6 +860,10 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                     "bypassed_standard_diversification_guidelines",
                 ],
             })
+            st.session_state.setdefault("behavior_event_log", []).append({
+                "category": "Attention Patterns",
+                "description": "Triggered CHALLENGING posture"
+            })
             write_current_behavioral_to_registry(get_active_slot_id())
             st.rerun()
 
@@ -795,6 +873,10 @@ No adjustments are currently required. Stay with your existing plan and cadence.
             st.session_state["reinforcing_count"] = st.session_state.get("reinforcing_count", 0) + 1
             capture_event("reinforcement_event", {
                 "portfolio": state.selected_portfolio
+            })
+            st.session_state.setdefault("behavior_event_log", []).append({
+                "category": "Reinforcement Moments",
+                "description": "Triggered REINFORCING posture"
             })
             write_current_behavioral_to_registry(get_active_slot_id())
             st.rerun()
@@ -920,6 +1002,10 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                 "type": "historical_drops",
                 "portfolio": state.selected_portfolio
             })
+            st.session_state.setdefault("behavior_event_log", []).append({
+                "category": "Attention Patterns",
+                "description": "Viewed historical context in Guided Question"
+            })
 
             st.subheader("Your Next Best Question (Follow‑Up)")
             st.markdown("Here’s the perspective that usually helps during weeks like this.")
@@ -1016,6 +1102,10 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                 st.session_state["friend_profile"] = updated_profile
                 # v0.2 write-back after profile mutation
                 write_current_behavioral_to_registry(get_active_slot_id())
+                st.session_state.setdefault("behavior_event_log", []).append({
+                    "category": "Manual Bookkeeping",
+                    "description": "Updated Friend Profile details"
+                })
                 st.success("Your Friend Profile has been updated. The Identity Card and Guided Question have adapted to your changes. You did this. I’m just helping you see it.")
                 st.rerun()
 
@@ -1084,92 +1174,16 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                     if st.form_submit_button("Commit manual update"):
                         st.session_state["sandbox_ledger"][target_ticker]["shares"] = new_shares
                         st.session_state["sandbox_ledger"][target_ticker]["price"] = new_price
+                        st.session_state["ledger_update_count"] = st.session_state.get("ledger_update_count", 0) + 1
+                        st.session_state.setdefault("behavior_event_log", []).append({
+                            "category": "Manual Bookkeeping",
+                            "description": f"Updated {target_ticker} shares or price"
+                        })
                         st.success(
                             f"Ledger entry for {target_ticker} updated in session. "
                             "Identity alignment preserved."
                         )
                         st.rerun()
-
-        # === RELATIONSHIP MEMORY GRAPH VIEWER (v0.1) ===
-        # Thin, session-only, read-only audit surface per the Relationship Memory Graph Viewer micro-chunk.
-        # Reuses existing behavioral_events + panic_pattern_nodes (no new storage keys).
-        # Enforces: "A true companion never keeps a secret file on your behavior."
-        # Placement: directly under the Editable Profile (before the lower friend view summaries).
-        # Language strictly action-based, non-diagnostic. Purge is nuclear + confirmed.
-        # Unfiltered View collapses the surface per governance rules.
-
-        st.markdown("---")
-
-        is_unfiltered = st.session_state.get("unfiltered_view", False)
-
-        with st.container(border=True):
-            st.subheader("What I'm Remembering This Session")
-
-            if is_unfiltered:
-                force_neutral_all_slots()
-                st.caption("Memory-assisted guidance is currently deactivated for this session via your Unfiltered View override toggle.")
-                # Do not render any event details when governance override is active
-            else:
-                # Thin read of real session state (no behavior_event_log alias; use the live ones)
-                session_events = get_events()
-                current_panic = get_current_panic_pattern()
-
-                if not current_panic and not any(getattr(e, "event_type", None) == "panic_pattern" for e in session_events):
-                    st.info("I haven't recorded any behavioral variations in this session yet. This section dynamically updates when actions trigger structural safety adjustments.")
-                else:
-                    st.caption("This layer ensures complete transparency. A true companion never keeps a secret file on your behavior.")
-                    st.caption("This transparent log displays how your real-time interaction patterns adjust our communication parameters. This data lives strictly in volatile memory.")
-
-                    # Render the observed pattern using neutral, action-only language (Rule 2a/2b/2c)
-                    # We translate the existence of the panic_pattern node / event into the prescribed framing.
-                    for event in session_events:
-                        et = getattr(event, "event_type", None) if not isinstance(event, dict) else event.get("event_type")
-                        if et == "panic_pattern":
-                            # Compute a light count for granularity (from the same event stream)
-                            check_count = sum(1 for e in session_events if getattr(e, "event_type", None) == "portfolio_check")
-                            st.markdown(f"""
-**Active Tracking: High Interaction Volume During Market Variance**
-* **Observed Signal:** App tracking interfaces reviewed {check_count} times while valuation metrics shifted downward.
-* **System Adjustment:** Structural focus moved toward cash-flow runway protection to isolate short-term volatility.
-""")
-                            break
-                    else:
-                        # Fallback if only the node exists (no separate event record this run)
-                        if current_panic:
-                            check_count = sum(1 for e in session_events if getattr(e, "event_type", None) == "portfolio_check")
-                            st.markdown(f"""
-**Active Tracking: High Interaction Volume During Market Variance**
-* **Observed Signal:** App tracking interfaces reviewed {check_count} times while valuation metrics shifted downward.
-* **System Adjustment:** Structural focus moved toward cash-flow runway protection to isolate short-term volatility.
-""")
-
-                    st.markdown("---")
-
-                    # Destructive Sovereign Purge Pipeline (two-step confirm, atomic teardown)
-                    if "confirm_purge" not in st.session_state:
-                        st.session_state["confirm_purge"] = False
-
-                    if not st.session_state["confirm_purge"]:
-                        if st.button("Clear Everything I've Shared This Session", key="purge_init_btn"):
-                            st.session_state["confirm_purge"] = True
-                            st.rerun()
-                    else:
-                        st.warning("Are you sure? This instantly wipes all logged behavioral triggers and resets the communication interface back to neutral baseline standards. This cannot be undone.")
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.button("Yes, Clear My Session Memory", key="purge_confirm_btn"):
-                                # Nuclear structural purge sequence (session-only)
-                                st.session_state["behavioral_events"] = []
-                                st.session_state["panic_pattern_nodes"] = []
-                                st.session_state["behavioral_state"] = "NEUTRAL"
-                                write_current_behavioral_to_registry(get_active_slot_id())
-                                st.session_state["confirm_purge"] = False
-                                st.success("Session memory dropped cleanly. Starting fresh.")
-                                st.rerun()
-                        with col2:
-                            if st.button("Cancel Reset", key="purge_cancel_btn"):
-                                st.session_state["confirm_purge"] = False
-                                st.rerun()
 
         friend_view = get_friend_view_data(
             state.selected_portfolio, registry, lifecycles, snapshot
