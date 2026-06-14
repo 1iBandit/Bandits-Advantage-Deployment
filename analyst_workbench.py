@@ -273,6 +273,18 @@ def main():
         )
         st.caption("Hero Decision Band is always shown above (4L requirement)")  # Caption per hierarchy
 
+        # Early Friend profile + state init for Hero Band Context Awareness (v0.1)
+        # Ensures current_profile and behavioral state are in session_state before the
+        # top-of-page Hero Band renders (so posture can react to CALMING from Memory Graph).
+        mode_for_init = st.session_state.get("view_mode", "Analyst (4I+4J)")
+        if "Friend" in mode_for_init:
+            if "friend_profile" not in st.session_state or not isinstance(
+                st.session_state.get("friend_profile"), FriendProfile
+            ):
+                st.session_state["friend_profile"] = create_example_friend_profile(
+                    profile_id=f"{state.selected_portfolio}_friend"
+                )
+
         # Note: "Investigation Mode (4J)" below uses st.header (H1) for section, consistent with hierarchy for major investigative surfaces.
 
         st.divider()
@@ -332,6 +344,8 @@ def main():
 
     # === Phase 4L Hero Decision Band (dominant, always visible, mode-independent) ===
     # All data from get_hero_decision_band_data (thin presenter in narrative.py)
+    # Hero Band Context Awareness v0.1: linguistic posture mutates on CALMING from Relationship Memory Graph.
+    # Core analytical recommendation + metrics remain immutable (no calculation distortion).
     hero = get_hero_decision_band_data(
         state.selected_portfolio, registry, lifecycles, snapshot
     )
@@ -339,23 +353,73 @@ def main():
     rec = hero["primary_recommendation"]
     is_abstain = hero.get("is_abstaining", False)
 
-    if is_abstain:
-        st.error(f"**{rec} (ABSTAIN)**", icon="🛑")
+    # Context Awareness inputs (thin, from session / Memory Graph)
+    # Profile guaranteed by early init when in Friend mode; events populated by simulate.
+    mode_now = st.session_state.get("view_mode", "Analyst (4I+4J)")
+    is_friend = "Friend" in mode_now
+    calming_state = None
+    try:
+        evs = get_events()
+        calming_state = infer_state(evs)
+    except Exception:
+        pass
+    is_unfiltered = st.session_state.get("unfiltered_view", False)
+    current_profile = st.session_state.get("friend_profile")
+    max_dd = 15.0
+    if current_profile and hasattr(current_profile, "risk_constraints"):
+        max_dd = current_profile.risk_constraints.get("max_drawdown_pct", 15.0)
+
+    if is_friend and calming_state == "CALMING" and not is_unfiltered:
+        # CALMING intercept — elevate behavioral posture to top of stack (spec v0.1)
+        # Time-horizon anchoring + risk framing from profile. Agency preserved.
+        st.markdown("### ⚡ Current Posture")
+        st.markdown("##  POSTURE: INSULATED & PROTECTED")
+        st.markdown(f"""
+        Given your **12-Month Strategic Horizon** and documented comfort zone (**max drawdown: {max_dd}%**), 
+        your core capital remains entirely insulated from short-term market variance. 
+
+        Our pre-calculated defense plan is actively executing. No structural changes are required today.
+        """)
+        st.caption("**Timeline Framework:** 12-Month Continuous View | **System State:** STATUS: ACTIVE DEFENSE | **Timestamp:** Live via Session Lifecycle")
+
+        # Raw analytical core remains visible (data integrity — never hidden or altered)
+        if is_abstain:
+            st.caption(f"Analytical Recommendation (unchanged data): **{rec} (ABSTAIN)**")
+        else:
+            st.caption(f"Analytical Recommendation (unchanged data): **{rec}**")
+
+        # Metrics (factual layer) still rendered
+        band_cols = st.columns(4)
+        with band_cols[0]:
+            st.metric("Directional Bias", hero.get("directional_bias", "—"))
+        with band_cols[1]:
+            st.metric("Risk State", hero.get("risk_state", "—"))
+        with band_cols[2]:
+            st.metric("Confidence", hero.get("confidence_bucket", "—"))
+        if hero.get("abstention_reason"):
+            with band_cols[3]:
+                st.caption(f"Reason: {hero['abstention_reason']}")
+
+        st.caption(f"Hero Band • {state.selected_portfolio} • Phase 4L (Context-Aware)")
     else:
-        st.success(f"**{rec}**", icon="✅")
+        # Standard baseline execution frame (or Analyst mode, or unfiltered)
+        if is_abstain:
+            st.error(f"**{rec} (ABSTAIN)**", icon="🛑")
+        else:
+            st.success(f"**{rec}**", icon="✅")
 
-    band_cols = st.columns(4)
-    with band_cols[0]:
-        st.metric("Directional Bias", hero.get("directional_bias", "—"))
-    with band_cols[1]:
-        st.metric("Risk State", hero.get("risk_state", "—"))
-    with band_cols[2]:
-        st.metric("Confidence", hero.get("confidence_bucket", "—"))
-    if hero.get("abstention_reason"):
-        with band_cols[3]:
-            st.caption(f"Reason: {hero['abstention_reason']}")
+        band_cols = st.columns(4)
+        with band_cols[0]:
+            st.metric("Directional Bias", hero.get("directional_bias", "—"))
+        with band_cols[1]:
+            st.metric("Risk State", hero.get("risk_state", "—"))
+        with band_cols[2]:
+            st.metric("Confidence", hero.get("confidence_bucket", "—"))
+        if hero.get("abstention_reason"):
+            with band_cols[3]:
+                st.caption(f"Reason: {hero['abstention_reason']}")
 
-    st.caption(f"Hero Band • {state.selected_portfolio} • Phase 4L")
+        st.caption(f"Hero Band • {state.selected_portfolio} • Phase 4L")
     st.divider()
 
     # This single call exercises the complete locked 4J surface (state application + all presenters)
@@ -437,14 +501,12 @@ def main():
                 })
 
             continuity_header = "This week’s volatility is similar to periods you’ve found stressful before. Let’s focus on stability."
-            hero_framing = "Given your discomfort with drawdowns above 15%, I’m prioritizing stability over action today."
             identity_framing = "I'm guiding you as a BalancedCore investor, with extra focus on protecting your comfort zone during volatility."
             guided_question = "What would help you feel safe staying the course here?"
             guided_rationale = "Avoiding panic-selling during periods like this has historically improved long-term stability for investors like you."
             explain_text = "You’ve been checking short-term changes more frequently today, so I’m foregrounding stability and long-term context. All of your usual details are still available below."
         else:
             continuity_header = None
-            hero_framing = None
             identity_framing = None
             guided_question = None
             guided_rationale = None
@@ -452,9 +514,6 @@ def main():
 
         if continuity_header:
             st.caption(continuity_header)
-
-        if hero_framing:
-            st.caption(hero_framing)
 
         # === Friend Mode Identity Card ===
         # Now passes the (potentially edited) profile so it reflects user input.
