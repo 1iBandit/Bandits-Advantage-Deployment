@@ -79,6 +79,8 @@ from src.engine.portfolio.workbench_ui import (
     export_current_workbench_state,
 )
 
+import streamlit.components.v1 as components
+
 
 # =============================================================================
 # Demo data setup (identical spirit to test_phase4j_workbench_flows_v0.2.py)
@@ -378,6 +380,65 @@ def main():
             )
 
         current_profile: FriendProfile = st.session_state["friend_profile"]
+
+        # === Temporary verification patch: bright border + tint on the Identity Card
+        # so we can instantly see whether the latest canonical code is live after
+        # sync + redeploy. (Remove once we confirm the pipeline is healthy.)
+        # TEMP diagnostic: Find bordered containers and the one containing "Identity Card"
+        # Dumps data-testid, style, class, and outerHTML for the relevant wrappers.
+        # Look for the bordered div that wraps the "Identity Card" content.
+        import streamlit.components.v1 as components
+        components.html(
+            """
+            <script>
+            // Find all bordered containers (the ones with inline border style)
+            const bordered = document.querySelectorAll('div[style*="border"]');
+            let out = ['=== Bordered Containers (likely cards) ==='];
+            bordered.forEach((b, i) => {
+                const testid = b.getAttribute('data-testid') || '';
+                const style = b.getAttribute('style') || '';
+                const cls = b.className || '';
+                const text = b.innerText ? b.innerText.substring(0, 100) : '';
+                out.push(`Bordered #${i}: data-testid="${testid}" | style="${style.substring(0,200)}" | class="${cls}"`);
+                out.push(`  Contains text: "${text}"...`);
+                out.push(`  outerHTML: ${b.outerHTML.substring(0, 400)}...`);
+            });
+
+            // Also find the ancestor chain for "Identity Card" text
+            out.push('\\n=== Ancestor chain for "Identity Card" text ===');
+            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+            let target = null;
+            let node;
+            while (node = walker.nextNode()) {
+                if (node.nodeValue.includes('Identity Card')) {
+                    target = node.parentElement;
+                    break;
+                }
+            }
+            if (target) {
+                let current = target;
+                let depth = 0;
+                while (current && depth < 6) {
+                    const tag = current.tagName;
+                    const testid = current.getAttribute('data-testid') || '';
+                    const style = current.getAttribute('style') || '';
+                    const cls = current.className || '';
+                    out.push(`Depth ${depth}: ${tag} | data-testid="${testid}" | style="${style.substring(0,150)}" | class="${cls}"`);
+                    out.push(`  outerHTML: ${current.outerHTML.substring(0, 300)}...`);
+                    current = current.parentElement;
+                    depth++;
+                }
+            } else {
+                out.push("Could not find 'Identity Card' text in DOM");
+            }
+
+            const pre = document.createElement('pre');
+            pre.innerText = out.join("\\n");
+            document.body.appendChild(pre);
+            </script>
+            """,
+            height=800,
+        )
 
         # === Friend Mode Identity Card ===
         # Now passes the (potentially edited) profile so it reflects user input.
