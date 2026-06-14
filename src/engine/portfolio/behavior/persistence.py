@@ -34,8 +34,9 @@ from cryptography.fernet import Fernet, InvalidToken
 # For now we use a fixed key so the sandbox state is portable across runs.
 # Fernet key must be 32 urlsafe base64 bytes.
 # =============================================================================
-# Generated once for this demo. Replace in production with proper key mgmt.
-_FERNET_KEY = b'kL3vK8vN5pQ7rS9tU2vW4xY6zA8bC0dE2fG4hI6jK8lM='  # 32-byte base64 example
+# Generated once for this demo (valid 32-byte urlsafe base64).
+# Replace in production with proper key management.
+_FERNET_KEY = b'Ye07qOYsKsHeTl701pNoqZEtUyELTq6YpQPRfd8gJ4k='
 _FERNET = Fernet(_FERNET_KEY)
 
 
