@@ -539,6 +539,8 @@ No adjustments are currently required. Stay with your existing plan and cadence.
         st.markdown(
             f"**Buddy: David** | Active: **{display_name} ({idx}/{total})**"
         )
+        # v0.2 "Why We Keep It Tight" explainer - subtle in Continuity Header
+        st.caption("Why We Keep It Tight: We focus on assets with real trading volume and history. This keeps the experience clear and protects you from noise that can trigger impulsive decisions.")
         # Lightweight switch affordance (full isolation + teardown on change)
         # The sidebar also has the selector; this header makes the behavioral context the north star.
         slot_options = list(st.session_state.get("portfolio_behavioral_registry", {}).keys())
@@ -662,6 +664,7 @@ No adjustments are currently required. Stay with your existing plan and cadence.
             )
             if st.button("This is my first step — let's lock it in", key="liam_commit_continue"):
                 st.session_state["liam_commit"] = commit_amount
+                st.session_state["reinforcing_count"] = st.session_state.get("reinforcing_count", 0) + 1
                 advance_liam_step(5, "REINFORCING")
 
         elif liam_step == 5:
@@ -688,6 +691,7 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                     "price": 1.0,
                     "date": "2026-06"
                 }
+                st.session_state["ledger_update_count"] = st.session_state.get("ledger_update_count", 0) + 1
                 st.success(
                     f"Perfect — your ${commit} first commitment is now reflected in the 1i_Bandit sandbox ledger as CASH. "
                     "This is how we practice the habit safely."
@@ -705,7 +709,34 @@ No adjustments are currently required. Stay with your existing plan and cadence.
         if liam_step >= 6:
             st.caption("Onboarding complete for this session. Your behavioral state is now set to REINFORCING, and the sandbox reflects your first step. The other surfaces below will respond to this.")
 
+            # v0.2 Graduation Ceremony - triggered on Liam complete + REINFORCING or disciplined ledger activity
+            reinforcing_count = st.session_state.get("reinforcing_count", 0)
+            ledger_update_count = st.session_state.get("ledger_update_count", 0)
+            if reinforcing_count > 0 or ledger_update_count > 1:
+                st.markdown("---")
+                st.subheader("🎉 Graduation Ceremony")
+                st.markdown("You’ve built a solid foundation here. If you ever want to explore deeper or more complex markets, we’ll help prepare you — and we’ll always be here when you need clarity and steady ground.")
+
         # Note: The Identity Card and Guided Question use st.subheader for their titles (H2 per locked Typography for card headers / major Friend Mode surfaces). Internal bold labels (e.g. **Primary Goals**) are H3 (Medium). All framing/provenance use st.caption (Caption per locked).
+
+        # === v0.2 Gated Ticker Request (Surface 3.6) - inside Buddy Sandbox / Manual Ledger area ===
+        # Prevents free-form search, routes to human (David). Clear pause and boundary.
+        st.markdown("---")
+        st.subheader("➕ Request an Asset Addition")
+        st.markdown("Our system stays intentionally focused on assets with strong volume history. This protects you from thinly traded or highly speculative names.")
+        ticker_request = st.text_input("Ticker symbol to request (e.g. NEWASSET)", key="gated_ticker_input")
+        if st.button("Submit Request to David", key="gated_ticker_submit"):
+            if ticker_request:
+                requests = st.session_state.setdefault("ticker_requests", [])
+                requests.append(ticker_request.upper())
+                st.session_state["ticker_requests"] = requests
+                st.success("Request submitted to David. He will personally review the volume profile with you.")
+        st.caption("This sends a direct request to your system mentor. David will personally review the volume profile with you.")
+
+        # Request Help From David - direct human bridge, low-prominence in sandbox area
+        if st.button("Request Help From David", key="request_help_david"):
+            st.info("Not support. A direct line to your system mentor for guidance on your financial path. Your request has been noted and David will respond with tailored guidance.")
+        st.caption("Not support. A direct line to your system mentor for guidance on your financial path.")
 
         # Friend Mode color system styles (from locked Color System + Card Design)
         # Applied to the .identity-card-wrapper class we inject around the Identity Card.
@@ -761,6 +792,7 @@ No adjustments are currently required. Stay with your existing plan and cadence.
         # Simulate Reinforcing Pattern for REINFORCING state (v0.1)
         if st.button("Simulate Reinforcing Pattern", key="btn_simulate_reinforcing"):
             st.session_state["behavioral_state"] = "REINFORCING"
+            st.session_state["reinforcing_count"] = st.session_state.get("reinforcing_count", 0) + 1
             capture_event("reinforcement_event", {
                 "portfolio": state.selected_portfolio
             })
@@ -841,6 +873,10 @@ No adjustments are currently required. Stay with your existing plan and cadence.
             if tendencies:
                 st.markdown("**I'm watching for these tendencies:** " + ", ".join(tendencies))
             st.caption("This is the first visible expression of your Friend Profile.")
+
+            # v0.2 accessible from Identity Card: Request Help From David (low prominence)
+            if st.button("Request Help From David", key="help_from_identity"):
+                st.info("Not support. A direct line to your system mentor for guidance on your financial path.")
 
             st.markdown('</div>', unsafe_allow_html=True)
 
