@@ -430,6 +430,11 @@ def main():
                     outcome="no_panic_sale",
                 )
                 add_panic_pattern(node)
+                capture_event("panic_pattern", {
+                    "triggers": ["high_checking", "volatility"],
+                    "adjustment": "calming_flow_v0",
+                    "portfolio": state.selected_portfolio
+                })
 
             continuity_header = "This week’s volatility is similar to periods you’ve found stressful before. Let’s focus on stability."
             hero_framing = "Given your discomfort with drawdowns above 15%, I’m prioritizing stability over action today."
@@ -626,6 +631,84 @@ def main():
                 st.session_state["friend_profile"] = updated_profile
                 st.success("Your Friend Profile has been updated. The Identity Card and Guided Question have adapted to your changes. You did this. I’m just helping you see it.")
                 st.rerun()
+
+        # === RELATIONSHIP MEMORY GRAPH VIEWER (v0.1) ===
+        # Thin, session-only, read-only audit surface per the Relationship Memory Graph Viewer micro-chunk.
+        # Reuses existing behavioral_events + panic_pattern_nodes (no new storage keys).
+        # Enforces: "A true companion never keeps a secret file on your behavior."
+        # Placement: directly under the Editable Profile (before the lower friend view summaries).
+        # Language strictly action-based, non-diagnostic. Purge is nuclear + confirmed.
+        # Unfiltered View collapses the surface per governance rules.
+
+        st.markdown("---")
+
+        is_unfiltered = st.session_state.get("unfiltered_view", False)
+
+        with st.container(border=True):
+            st.subheader("What I'm Remembering This Session")
+
+            if is_unfiltered:
+                st.caption("Memory-assisted guidance is currently deactivated for this session via your Unfiltered View override toggle.")
+                # Do not render any event details when governance override is active
+            else:
+                # Thin read of real session state (no behavior_event_log alias; use the live ones)
+                session_events = get_events()
+                current_panic = get_current_panic_pattern()
+
+                if not current_panic and not any(getattr(e, "event_type", None) == "panic_pattern" for e in session_events):
+                    st.info("I haven't recorded any behavioral variations in this session yet. This section dynamically updates when actions trigger structural safety adjustments.")
+                else:
+                    st.caption("This layer ensures complete transparency. A true companion never keeps a secret file on your behavior.")
+                    st.caption("This transparent log displays how your real-time interaction patterns adjust our communication parameters. This data lives strictly in volatile memory.")
+
+                    # Render the observed pattern using neutral, action-only language (Rule 2a/2b/2c)
+                    # We translate the existence of the panic_pattern node / event into the prescribed framing.
+                    for event in session_events:
+                        et = getattr(event, "event_type", None) if not isinstance(event, dict) else event.get("event_type")
+                        if et == "panic_pattern":
+                            # Compute a light count for granularity (from the same event stream)
+                            check_count = sum(1 for e in session_events if getattr(e, "event_type", None) == "portfolio_check")
+                            st.markdown(f"""
+**Active Tracking: High Interaction Volume During Market Variance**
+* **Observed Signal:** App tracking interfaces reviewed {check_count} times while valuation metrics shifted downward.
+* **System Adjustment:** Structural focus moved toward cash-flow runway protection to isolate short-term volatility.
+""")
+                            break
+                    else:
+                        # Fallback if only the node exists (no separate event record this run)
+                        if current_panic:
+                            check_count = sum(1 for e in session_events if getattr(e, "event_type", None) == "portfolio_check")
+                            st.markdown(f"""
+**Active Tracking: High Interaction Volume During Market Variance**
+* **Observed Signal:** App tracking interfaces reviewed {check_count} times while valuation metrics shifted downward.
+* **System Adjustment:** Structural focus moved toward cash-flow runway protection to isolate short-term volatility.
+""")
+
+                    st.markdown("---")
+
+                    # Destructive Sovereign Purge Pipeline (two-step confirm, atomic teardown)
+                    if "confirm_purge" not in st.session_state:
+                        st.session_state["confirm_purge"] = False
+
+                    if not st.session_state["confirm_purge"]:
+                        if st.button("Clear Everything I've Shared This Session", key="purge_init_btn"):
+                            st.session_state["confirm_purge"] = True
+                            st.rerun()
+                    else:
+                        st.warning("Are you sure? This instantly wipes all logged behavioral triggers and resets the communication interface back to neutral baseline standards. This cannot be undone.")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("Yes, Clear My Session Memory", key="purge_confirm_btn"):
+                                # Nuclear structural purge sequence (session-only)
+                                st.session_state["behavioral_events"] = []
+                                st.session_state["panic_pattern_nodes"] = []
+                                st.session_state["confirm_purge"] = False
+                                st.success("Session memory dropped cleanly. Starting fresh.")
+                                st.rerun()
+                        with col2:
+                            if st.button("Cancel Reset", key="purge_cancel_btn"):
+                                st.session_state["confirm_purge"] = False
+                                st.rerun()
 
         friend_view = get_friend_view_data(
             state.selected_portfolio, registry, lifecycles, snapshot
