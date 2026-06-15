@@ -126,6 +126,11 @@ def setup_demo_data() -> Dict[str, Any]:
     )
     registry = registry.register(id_preservation)
 
+    id_income = create_portfolio_identity(
+        "P003_INCOME", "Income Anchor", "Income", "2026-01-01", base_chain
+    )
+    registry = registry.register(id_income)
+
     # Minimal but representative objects (same shape as the validation test)
     rec_states_g = [
         {
@@ -161,6 +166,23 @@ def setup_demo_data() -> Dict[str, Any]:
         )
     ]
 
+    rec_states_i = [
+        {
+            "recommendation_id": "NEE:HOLD",
+            "recommendation_family": "HOLD",
+            "stability_band": "High",
+            "risk_regime": "Controlled",
+            "overall_confidence": 0.81,
+        }
+    ]
+    risk_i = [{"risk_score": 0.22, "risk_regime": "Controlled"}]
+    lc_i = [
+        RecommendationLifecycle(
+            "NEE:HOLD", "STRENGTHENING", ["EMERGED", "STRENGTHENED"], base_chain,
+            {"portfolio_id": "P003_INCOME"}
+        )
+    ]
+
     snap_g = build_portfolio_snapshot(
         "P001_GROWTH", base_chain.narrative_chain_id, rec_states_g, risk_g, lc_g, base_chain,
         {"source": "4C-streamlit-demo", "portfolio_id": "P001_GROWTH"}
@@ -169,22 +191,30 @@ def setup_demo_data() -> Dict[str, Any]:
         "P002_PRESERVATION", base_chain.narrative_chain_id, rec_states_p, risk_p, lc_p, base_chain,
         {"source": "4C-streamlit-demo", "portfolio_id": "P002_PRESERVATION"}
     )
+    snap_i = build_portfolio_snapshot(
+        "P003_INCOME", base_chain.narrative_chain_id, rec_states_i, risk_i, lc_i, base_chain,
+        {"source": "4C-streamlit-demo", "portfolio_id": "P003_INCOME"}
+    )
 
     # Minimal weekly update placeholders (the real generator lives in narrative)
     base_weekly_g = {"portfolio_id": "P001_GROWTH", "executive_summary": "Demo growth portfolio state."}
     base_weekly_p = {"portfolio_id": "P002_PRESERVATION", "executive_summary": "Demo preservation portfolio state."}
+    base_weekly_i = {"portfolio_id": "P003_INCOME", "executive_summary": "Demo income portfolio state."}
 
     lifecycles_map = {
         "P001_GROWTH": lc_g,
         "P002_PRESERVATION": lc_p,
+        "P003_INCOME": lc_i,
     }
     snapshots_map = {
         "P001_GROWTH": snap_g,
         "P002_PRESERVATION": snap_p,
+        "P003_INCOME": snap_i,
     }
     base_weekly_map = {
         "P001_GROWTH": base_weekly_g,
         "P002_PRESERVATION": base_weekly_p,
+        "P003_INCOME": base_weekly_i,
     }
 
     # Empty ledger for delivery panel (real usage would come from 4G)
@@ -201,13 +231,32 @@ def setup_demo_data() -> Dict[str, Any]:
 
 
 def get_current_objects(demo: Dict[str, Any], portfolio_id: str):
-    """Helper to grab the right objects for the selected portfolio."""
+    """Helper to grab the right objects for the selected portfolio.
+
+    Defensive: if the selected portfolio has no demo slice (e.g. selector/data drift),
+    fall back to the first available so the surface remains usable instead of hard KeyError.
+    The narrative presenters already return "unknown portfolio" safe objects when the
+    registry itself lacks the id.
+    """
+    lifecycles_map = demo.get("lifecycles", {})
+    snapshots_map = demo.get("snapshots", {})
+    base_weekly_map = demo.get("base_weekly", {})
+
+    if portfolio_id not in lifecycles_map:
+        # Fallback keeps the app alive; real fix is ensuring setup_demo_data covers all
+        # options advertised in the "Active Portfolio" selector.
+        if lifecycles_map:
+            portfolio_id = next(iter(lifecycles_map.keys()))
+        else:
+            # Extreme degenerate case; return empty-ish structures (callers expect lists/dicts)
+            return demo.get("registry"), [], None, demo.get("ledger", []), {}
+
     return (
         demo["registry"],
-        demo["lifecycles"][portfolio_id],
-        demo["snapshots"][portfolio_id],
+        lifecycles_map[portfolio_id],
+        snapshots_map[portfolio_id],
         demo["ledger"],
-        demo["base_weekly"][portfolio_id],
+        base_weekly_map[portfolio_id],
     )
 
 
@@ -258,7 +307,10 @@ def main():
         st.header("Portfolio & Time")
 
         # v0.2: Extended to 3 slots for behavioral isolation demo (1/3 in header)
-        portfolio_options = ["P001_GROWTH", "P002_PRESERVATION", "P003_INCOME"]
+        # Derive from the actual demo data so the selector can never offer a portfolio
+        # that will cause KeyError in get_current_objects (or "unknown portfolio" degradation
+        # deeper in the narrative presenters).
+        portfolio_options = list(demo.get("lifecycles", {}).keys()) or ["P001_GROWTH", "P002_PRESERVATION", "P003_INCOME"]
         current_idx = portfolio_options.index(state.selected_portfolio) if state.selected_portfolio in portfolio_options else 0
         new_portfolio = st.selectbox(
             "Active Portfolio",
@@ -549,6 +601,18 @@ No adjustments are currently required. Stay with your existing plan and cadence.
         )
         # v0.2 "Why We Keep It Tight" explainer - subtle in Continuity Header
         st.caption("Why We Keep It Tight: We focus on assets with real trading volume and history. This keeps the experience clear and protects you from noise that can trigger impulsive decisions.")
+
+        # v0.3 Guidance Level toggle (demo for tonight - Quiet/Standard/Companion)
+        guidance_level = st.radio(
+            "Guidance Level (demo)",
+            ["Quiet", "Standard", "Companion"],
+            index=1,
+            horizontal=True,
+            key="guidance_level"
+        )
+        if guidance_level == "Quiet":
+            st.caption("(Quiet mode: minimal narration for review)")
+
         # Lightweight switch affordance (full isolation + teardown on change)
         # The sidebar also has the selector; this header makes the behavioral context the north star.
         slot_options = list(st.session_state.get("portfolio_behavioral_registry", {}).keys())
@@ -575,6 +639,41 @@ No adjustments are currently required. Stay with your existing plan and cadence.
         # This ensures the canonical December 2025 baseline or previously saved state is restored
         # before any onboarding, ledger, or behavioral surfaces run.
         initialize_or_load_buddy_session("1i_Bandit")
+
+        # v0.1 Return Home: update last seen on load
+        st.session_state["last_seen_timestamp"] = datetime.utcnow().isoformat()
+        trigger_encrypted_disk_sync("1i_Bandit")
+
+        # === Return Home Experience v0.1 (if returning after >7 days) ===
+        if st.session_state.get("show_return_home", False):
+            with st.container():
+                st.markdown("**Welcome back.**")
+                st.caption("It’s good to see you again.")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("Give me a quick snapshot.", key="return_snapshot"):
+                        st.session_state["show_return_home_snapshot"] = True
+                        st.rerun()
+                with col2:
+                    if st.button("I’m just checking in.", key="return_checkin"):
+                        st.session_state["show_return_home"] = False
+                        st.rerun()
+                if st.session_state.get("show_return_home_snapshot", False):
+                    st.markdown("**Quick Snapshot**")
+                    ledger = st.session_state.get("sandbox_ledger", {})
+                    cash = ledger.get("CASH", {}).get("shares", 0)
+                    st.markdown(f"Current sandbox cash: ${cash}")
+                    positions = ", ".join([f"{k}: {v.get('shares', 0)}" for k, v in list(ledger.items())[:3]])
+                    st.markdown(f"Key positions: {positions if positions else 'None yet'}")
+                    events = st.session_state.get("behavior_event_log", [])
+                    recent_reinf = [e for e in events if e.get("event_type") in ["reinforcement_event", "onboarding_completion"]][-1:]
+                    if recent_reinf:
+                        st.markdown(f"Recent: {recent_reinf[0].get('description', '')}")
+                    st.markdown("From what I can see, your setup still supports your long‑term stability.")
+                    st.caption("Why you’re seeing this: This is a simple recap of your current sandbox state to help you reorient quickly.")
+                    if st.button("Close snapshot", key="close_snapshot"):
+                        st.session_state["show_return_home_snapshot"] = False
+                        st.rerun()
 
         # === Liam Onboarding Question Tree v0.1 (GROUNDING → TEACHING → REINFORCING) ===
         # Multi-step conversational flow for avoidant, first-paycheck user (Liam persona).
@@ -834,6 +933,7 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                     st.text(f"• Action: {body}\n• Adjustment: {action}")
                     st.caption(f"Recorded: Live Session Context Lifecycle")
                 st.markdown("---")
+                st.caption("Why you’re seeing this: These are actions you took that align with stability and discipline. The Companion uses them only to adjust pacing and framing.")
 
             # 3. Render Standard Telemetry Footprints
             if neutral_events:

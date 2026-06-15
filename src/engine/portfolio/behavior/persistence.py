@@ -29,11 +29,6 @@ from typing import Any, Dict, Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 
-try:
-    import streamlit as st
-except ImportError:
-    st = None  # type: ignore
-
 # =============================================================================
 # Application-derived key (lightweight for v0.3 demo)
 # In a real deployment this should come from a secure source / user secret.
@@ -144,6 +139,8 @@ def initialize_or_load_buddy_session(buddy_id: str = "1i_Bandit") -> None:
 
     Must be called early in the Friend Mode path for the sandbox context.
     """
+    import streamlit as st
+
     # Always start behavioral context fresh (per spec)
     if "buddy_id" not in st.session_state:
         st.session_state["buddy_id"] = buddy_id
@@ -241,6 +238,8 @@ def trigger_encrypted_disk_sync(buddy_id: str = "1i_Bandit") -> bool:
     Called after meaningful user actions (manual ledger updates, etc.).
     Returns True on successful write, False on failure (non-fatal).
     """
+    import streamlit as st
+
     if "sandbox_ledger" not in st.session_state:
         return False
 

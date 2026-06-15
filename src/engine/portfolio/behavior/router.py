@@ -16,7 +16,6 @@ All mutators are pure with respect to st.session_state.
 
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import Any, Dict, List, Optional
 
 import streamlit as st
@@ -51,15 +50,30 @@ REQUIRED_PROFILE_FIELDS = ["profile_id", "personality_type", "primary_goals", "r
 
 
 def _ensure_dict_profile(profile: Any) -> Dict[str, Any]:
-    """Migration shim: convert namedtuple/dataclass/dict-like to dict."""
+    """Migration shim + defensive type guard.
+
+    Converts namedtuple/dataclass (including frozen FriendProfile)/dict-like
+    to a plain dict. Always returns a fresh dict (defensive copy where possible).
+    Used throughout the router to keep the behavioral registry as pure dicts
+    (no reliance on dataclass methods or _replace after initialization).
+    """
+    if profile is None:
+        raise ValueError("Cannot convert None to profile dict")
+
     if isinstance(profile, dict):
-        return profile
+        return dict(profile)  # defensive shallow copy
+
     if hasattr(profile, "to_dict"):
-        return profile.to_dict()
+        result = profile.to_dict()
+        return dict(result) if isinstance(result, dict) else result
+
     if hasattr(profile, "_asdict"):
-        return profile._asdict()
+        result = profile._asdict()
+        return dict(result) if isinstance(result, dict) else result
+
     if hasattr(profile, "__dict__"):
         return profile.__dict__.copy()
+
     raise ValueError(f"Cannot convert profile to dict: {type(profile)}")
 
 
@@ -71,21 +85,28 @@ def _validate_profile(profile: Dict[str, Any], slot_id: str) -> None:
 
 
 def _default_profile_for_slot(slot_id: str, slot_name: str) -> Dict[str, Any]:
-    """Create a default FriendProfile dict for the slot."""
+    """Create a default FriendProfile dict for the slot.
+
+    Uses direct dictionary mutation after conversion (no dataclass.replace or
+    any namedtuple _replace logic). This is the stable path for v0.2+ router
+    initialization to avoid AttributeError / frozen dataclass mutation issues.
+    """
     profile = create_example_friend_profile(profile_id=f"{slot_id}_friend")
-    # Customize slightly per slot for demo variety (still session-only)
-    if "INCOME" in slot_id:
-        profile = replace(
-            profile,
-            primary_goals=["moderate_income", "capital_preservation"],
-            risk_constraints={"max_drawdown_pct": 10.0},
-        )
-    elif "PRESERVATION" in slot_id:
-        profile = replace(
-            profile,
-            risk_constraints={"max_drawdown_pct": 12.0},
-        )
+
+    # Defensive type guard + conversion to dict (handles dataclass, prior namedtuple
+    # remnants, or raw dicts from any evolution of FriendProfile).
     prof_dict = _ensure_dict_profile(profile)
+    if not isinstance(prof_dict, dict):
+        raise TypeError(f"Expected dict after _ensure_dict_profile for slot {slot_id}, got {type(prof_dict)}")
+
+    # Direct dictionary mutation for per-slot demo customization (session-only).
+    # This replaces any previous replace() / _replace() calls in this function.
+    if "INCOME" in slot_id:
+        prof_dict["primary_goals"] = ["moderate_income", "capital_preservation"]
+        prof_dict["risk_constraints"] = {"max_drawdown_pct": 10.0}
+    elif "PRESERVATION" in slot_id:
+        prof_dict["risk_constraints"] = {"max_drawdown_pct": 12.0}
+
     _validate_profile(prof_dict, slot_id)
     return prof_dict
 
