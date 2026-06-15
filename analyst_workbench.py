@@ -716,6 +716,29 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                         st.session_state["show_return_home_snapshot"] = False
                         st.rerun()
 
+        # Soft Re-Entry State (pre-spine handshake for users who completed onboarding in previous session but returned without long absence)
+        # Preserves sovereignty: does not assume continuity or jump to full Return Home or spine.
+        # Shown if onboarding_completed from previous but not a >7 day absence (to avoid overlapping full Return Home).
+        if st.session_state.get("onboarding_completed", False) and not st.session_state.get("show_return_home", False):
+            st.markdown("---")
+            st.markdown("**Welcome back, David. I saved your setup from earlier.**")
+            st.markdown("How would you like to continue today?")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if st.button("Pick up where I left off", key="soft_pickup"):
+                    # Proceed to the post-entry spine (gated surfaces will show)
+                    pass
+            with col2:
+                if st.button("Start fresh", key="soft_fresh"):
+                    st.session_state["emotional_entry_done"] = False
+                    st.session_state["onboarding_completed"] = False
+                    st.rerun()
+            with col3:
+                if st.button("Just show me my accounts", key="soft_accounts"):
+                    # Proceed to spine (ledger will be visible early in gated content)
+                    st.session_state["soft_show_ledger"] = True
+                    st.rerun()
+
         # === Emotional Entry v0.1 (new non-prescriptive front door) ===
         # Strictly contextual and reflective per canonical boundary (2026-06-15).
         # Purpose: calibrate pacing, tone, and behavioral_state only.
@@ -781,7 +804,10 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                     })
 
                     st.session_state["emotional_entry_done"] = True
+                    st.session_state["onboarding_completed"] = True
+                    st.session_state["onboarding_focus"] = intent
                     st.success("Thank you. I'll keep this in mind as we look at things together.")
+                    trigger_encrypted_disk_sync("1i_Bandit")
                     st.rerun()
 
             # After Emotional Entry is complete, show the rest of the Friend surfaces
@@ -798,7 +824,9 @@ No adjustments are currently required. Stay with your existing plan and cadence.
         if st.session_state.get("emotional_entry_done", False) or st.session_state.get("unfiltered_view", False):
             # SURFACE 1.5: THE DYNAMIC ONBOARDING STATUS RIBBON (Collapsed Banner)
             st.markdown("---")
-            st.caption("Focus: Understand My Allocation Setup  |   Pacing: CALMING Mode Active")
+            focus = st.session_state.get("onboarding_focus", "Understand My Allocation Setup")
+            pacing = st.session_state.get("behavioral_state", "NEUTRAL")
+            st.caption(f"Focus: {focus}  |   Pacing: {pacing} Mode Active")
 
             # === v0.2 Gated Ticker Request (Surface 3.6) - inside Buddy Sandbox / Manual Ledger area ===
             # Prevents free-form search, routes to human (David). Clear pause and boundary.
@@ -1035,45 +1063,45 @@ div[data-testid="stVerticalBlock"] > div {
                 state.selected_portfolio, registry, friend_profile=current_profile
             )
 
-        if identity_framing:
-            identity_card["framing"] = identity_framing
+            if identity_framing:
+                identity_card["framing"] = identity_framing
 
-        # Guaranteed wrapper for styling — Streamlit cannot optimize this away
-        # (replaces border=True which was being collapsed)
-        identity_card_wrapper = st.container()
-        with identity_card_wrapper:
-            st.markdown('<div class="identity-card-wrapper">', unsafe_allow_html=True)
-            # v0.2: Identity Card now reflects the active portfolio's context (name + constraints from profile)
-            active_slot_name = get_slot_display_name(get_active_slot_id())
-            st.subheader("️ Identity Card")
-            st.caption(f"**{active_slot_name}** — {identity_card.get('framing', '')}")
+            # Guaranteed wrapper for styling — Streamlit cannot optimize this away
+            # (replaces border=True which was being collapsed)
+            identity_card_wrapper = st.container()
+            with identity_card_wrapper:
+                st.markdown('<div class="identity-card-wrapper">', unsafe_allow_html=True)
+                # v0.2: Identity Card now reflects the active portfolio's context (name + constraints from profile)
+                active_slot_name = get_slot_display_name(get_active_slot_id())
+                st.subheader("️ Identity Card")
+                st.caption(f"**{active_slot_name}** — {identity_card.get('framing', '')}")
 
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                st.metric("Personality", identity_card.get("personality_type", "—"))
-            with c2:
-                goals = identity_card.get("primary_goals", [])
-                st.markdown("**Primary Goals**")
-                st.caption(" • ".join(goals) if goals else "—")
-            with c3:
-                constraints = identity_card.get("key_constraints", {})
-                st.markdown("**Key Constraints**")
-                if constraints:
-                    for k, v in list(constraints.items())[:2]:
-                        st.caption(f"{k}: {v}")
-                else:
-                    st.caption("—")
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    st.metric("Personality", identity_card.get("personality_type", "—"))
+                with c2:
+                    goals = identity_card.get("primary_goals", [])
+                    st.markdown("**Primary Goals**")
+                    st.caption(" • ".join(goals) if goals else "—")
+                with c3:
+                    constraints = identity_card.get("key_constraints", {})
+                    st.markdown("**Key Constraints**")
+                    if constraints:
+                        for k, v in list(constraints.items())[:2]:
+                            st.caption(f"{k}: {v}")
+                    else:
+                        st.caption("—")
 
-            tendencies = identity_card.get("behavioral_tendencies_accounted", [])
-            if tendencies:
-                st.markdown("**I'm watching for these tendencies:** " + ", ".join(tendencies))
-            st.caption("This is the first visible expression of your Friend Profile.")
+                tendencies = identity_card.get("behavioral_tendencies_accounted", [])
+                if tendencies:
+                    st.markdown("**I'm watching for these tendencies:** " + ", ".join(tendencies))
+                st.caption("This is the first visible expression of your Friend Profile.")
 
-            # v0.2 accessible from Identity Card: Request Help From David (low prominence)
-            if st.button("Request Help From David", key="help_from_identity"):
-                st.info("Not support. A direct line to your system mentor for guidance on your financial path.")
+                # v0.2 accessible from Identity Card: Request Help From David (low prominence)
+                if st.button("Request Help From David", key="help_from_identity"):
+                    st.info("Not support. A direct line to your system mentor for guidance on your financial path.")
 
-            st.markdown('</div>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
 
         if st.session_state.get("emotional_entry_done", False) or st.session_state.get("unfiltered_view", False):
             # === First Guided Question ===

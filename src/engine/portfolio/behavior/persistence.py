@@ -165,6 +165,7 @@ def initialize_or_load_buddy_session(buddy_id: str = "1i_Bandit") -> None:
         }
         st.session_state["sandbox_ledger"] = baseline_ledger
         st.session_state["unfiltered_view"] = False
+        st.session_state["onboarding_completed"] = False
 
         # Seed a minimal relevant registry snapshot for the sandbox (isolated)
         st.session_state["portfolio_behavioral_registry"] = st.session_state.get(
@@ -203,6 +204,7 @@ def initialize_or_load_buddy_session(buddy_id: str = "1i_Bandit") -> None:
             "unfiltered_view": False,
             "last_seen": last_seen,
             "registry": st.session_state["portfolio_behavioral_registry"].get(buddy_id, {}),
+            "onboarding_completed": False,
         }
         save_buddy_state_to_disk(buddy_id, manifest)
         st.session_state["show_return_home"] = False
@@ -210,6 +212,7 @@ def initialize_or_load_buddy_session(buddy_id: str = "1i_Bandit") -> None:
         # Valid persisted state found – restore what we care about for the sandbox
         st.session_state["sandbox_ledger"] = manifest.get("ledger", {})
         st.session_state["unfiltered_view"] = manifest.get("unfiltered_view", False)
+        st.session_state["onboarding_completed"] = manifest.get("onboarding_completed", False)
 
         # Merge relevant registry snapshot if present (non-destructive)
         if "registry" in manifest and buddy_id in st.session_state.get("portfolio_behavioral_registry", {}):
@@ -247,6 +250,7 @@ def trigger_encrypted_disk_sync(buddy_id: str = "1i_Bandit") -> bool:
         "ledger": st.session_state["sandbox_ledger"],
         "unfiltered_view": st.session_state.get("unfiltered_view", False),
         "last_seen": st.session_state.get("last_seen_timestamp", datetime.utcnow().isoformat()),
+        "onboarding_completed": st.session_state.get("onboarding_completed", False),
     }
 
     # Include the sandbox slice of the registry if it exists
