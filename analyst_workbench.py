@@ -272,18 +272,49 @@ def main():
             "Then run: streamlit run analyst_workbench.py"
         )
 
+    # Deployment guard (canonical refinement loop, 2026-06-15)
+    # When FRIEND_OF_1IBANDIT_DEPLOYMENT=1 (set by the public thin wrapper),
+    # force pure Friend Mode only. Analyst Workbench surfaces remain available
+    # in local / personal analysis environments.
+    is_friend_deployment = os.environ.get("FRIEND_OF_1IBANDIT_DEPLOYMENT", "0") == "1"
+
+    if is_friend_deployment:
+        page_title = "Friend of 1iBandit"
+        page_icon = "🤝"
+        top_title = "🤝 Friend of 1iBandit"
+        top_caption = "A calm, sovereign reflection environment • All data from the isolated narrative spine"
+    else:
+        page_title = "Bandit's Advantage — Analyst Workbench"
+        page_icon = "📈"
+        top_title = "📈 Bandit's Advantage — Analyst Workbench"
+        top_caption = "Phase 4I + 4J  •  Thin read-only presentation layer  •  All data from isolated narrative spine"
+
     st.set_page_config(
-        page_title="Bandit's Advantage — Analyst Workbench",
-        page_icon="📈",
+        page_title=page_title,
+        page_icon=page_icon,
         layout="wide",
         initial_sidebar_state="expanded",
     )
 
-    st.title("📈 Bandit's Advantage — Analyst Workbench")
-    st.caption("Phase 4I + 4J  •  Thin read-only presentation layer  •  All data from isolated narrative spine")
+    st.title(top_title)
+    st.caption(top_caption)
 
     # Permanent guardrail banner (matches the locked contracts)
-    st.warning(
+    # In pure Friend deployment we keep a lighter version to preserve the architectural promise
+    # without Analyst framing.
+    if is_friend_deployment:
+        st.caption(
+            "**Architectural Guardrail**: This is a reflection companion. It renders only data from the Phase 3 engine "
+            "and Phase 4 observational layers. It performs no scoring, sets no targets, and never asks for commitments. "
+            "`intelligence_layers_enabled` remains False."
+        )
+    else:
+        st.warning(
+            "**Architectural Guardrail**: This UI only renders data produced by the Phase 3 calibrated decision engine "
+            "and the Phase 4A–4J observational layers (narrative.py). It performs no scoring, no new rules, "
+            "and never influences recommendations. `intelligence_layers_enabled` remains False. "
+            "State is session-only unless you explicitly Export an Investigation Note."
+        )
         "**Architectural Guardrail**: This UI only renders data produced by the Phase 3 calibrated decision engine "
         "and the Phase 4A–4J observational layers (narrative.py). It performs no scoring, no new rules, "
         "and never influences recommendations. `intelligence_layers_enabled` remains False. "
@@ -343,15 +374,22 @@ def main():
             st.rerun()
 
         st.divider()
-        st.header("Decision Surface Mode (Phase 4L)")  # H1 per locked Typography for page/major section titles
-        view_mode = st.radio(
-            "Mode",
-            ["Analyst (4I+4J)", "Friend (4K)"],
-            index=1,  # default to Friend (4K) so new features are visible on load
-            horizontal=True,
-            key="view_mode",
-        )
-        st.caption("Hero Decision Band is always shown above (4L requirement)")  # Caption per hierarchy
+
+        if is_friend_deployment:
+            # Pure Friend Mode in public deployment — no Analyst surfaces or mode switch visible.
+            view_mode = "Friend (4K)"
+            st.session_state["view_mode"] = view_mode
+            st.caption("Hero Decision Band is always shown above (4L requirement)")  # Caption per hierarchy
+        else:
+            st.header("Decision Surface Mode (Phase 4L)")  # H1 per locked Typography for page/major section titles
+            view_mode = st.radio(
+                "Mode",
+                ["Analyst (4I+4J)", "Friend (4K)"],
+                index=1,  # default to Friend (4K) so new features are visible on load
+                horizontal=True,
+                key="view_mode",
+            )
+            st.caption("Hero Decision Band is always shown above (4L requirement)")  # Caption per hierarchy
 
         # Early Friend profile + state init for Hero Band Context Awareness (v0.1)
         # Ensures current_profile and behavioral state are in session_state before the
@@ -587,6 +625,11 @@ No adjustments are currently required. Stay with your existing plan and cadence.
         # === Friend Mode (4K child spec) ===
         # Only the allowed elements: rationale, Why bullets, Show More, Export
         # Uses locked 4K presenters. Hero Band is already rendered above.
+        #
+        # Post-2026-06-15 boundary: Emotional Entry v0.1 is now the reflective front door (Phase 1).
+        # Personal Context follows (Phase 2). Portfolio Intake (Phase 3).
+        # No prescriptive onboarding. REINFORCING and other states only from allowed reflective triggers.
+        # See Docs/governance/never-include.md for permanent rules.
         st.divider()
         st.subheader("Friend Mode (4K)")  # H2 per locked Typography for mode headers
         st.caption("Guided companion experience powered by your Friend Profile.")  # Caption per hierarchy
@@ -637,7 +680,7 @@ No adjustments are currently required. Stay with your existing plan and cadence.
 
         # v0.3 Persistence Layer: load or seed 1i_Bandit sandbox state early in Friend Mode
         # This ensures the canonical December 2025 baseline or previously saved state is restored
-        # before any onboarding, ledger, or behavioral surfaces run.
+        # before any emotional entry, ledger, or behavioral surfaces run.
         initialize_or_load_buddy_session("1i_Bandit")
 
         # v0.1 Return Home: update last seen on load
@@ -666,7 +709,7 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                     positions = ", ".join([f"{k}: {v.get('shares', 0)}" for k, v in list(ledger.items())[:3]])
                     st.markdown(f"Key positions: {positions if positions else 'None yet'}")
                     events = st.session_state.get("behavior_event_log", [])
-                    recent_reinf = [e for e in events if e.get("event_type") in ["reinforcement_event", "onboarding_completion"]][-1:]
+                    recent_reinf = [e for e in events if e.get("event_type") in ["reinforcement_event", "discipline_event", "intentional_manual_update"]][-1:]
                     if recent_reinf:
                         st.markdown(f"Recent: {recent_reinf[0].get('description', '')}")
                     st.markdown("From what I can see, your setup still supports your long‑term stability.")
@@ -675,186 +718,75 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                         st.session_state["show_return_home_snapshot"] = False
                         st.rerun()
 
-        # === Liam Onboarding Question Tree v0.1 (GROUNDING → TEACHING → REINFORCING) ===
-        # Multi-step conversational flow for avoidant, first-paycheck user (Liam persona).
-        # Placed early in Friend Mode for onboarding focus. Integrates with sandbox_ledger and behavioral_state.
-        # Uses low-pressure inputs, sets states, updates ledger on commitment. Respects Unfiltered View.
-        if "liam_step" not in st.session_state:
-            st.session_state["liam_step"] = 0
-            st.session_state["behavioral_state"] = "GROUNDING"
+        # === Emotional Entry v0.1 (new non-prescriptive front door) ===
+        # Strictly contextual and reflective per canonical boundary (2026-06-15).
+        # Purpose: calibrate pacing, tone, and behavioral_state only.
+        # Never: numbers, commitments, targets, "first steps", ledger mutations, habit language, or performance framing.
+        # Placed early in Friend Mode after Return Home (if any) so the Companion can respond appropriately from the start.
+        # Respects Unfiltered View (bypass or minimal) and existing router/persistence/sandbox.
 
-        liam_step = st.session_state["liam_step"]
+        if not st.session_state.get("unfiltered_view", False):
+            if "emotional_entry_done" not in st.session_state:
+                st.session_state["emotional_entry_done"] = False
 
-        # Helper to advance step and optionally set state
-        def advance_liam_step(next_step, new_state=None):
-            st.session_state["liam_step"] = next_step
-            if new_state:
-                st.session_state["behavioral_state"] = new_state
-            st.rerun()
-
-        st.markdown("---")
-        st.subheader("Liam Onboarding Journey (v0.1 Demo)")
-
-        if liam_step == 0:
-            # Grounding Welcome
-            st.markdown("### Grounding Welcome")
-            st.markdown(
-                "Hey, this is your first real paycheck and your first real step with money. "
-                "No pressure, no judgment — we're just getting clear together in this safe sandbox. "
-                "I'm here to help you see what's possible, one small conversation at a time. "
-                "You did this. I’m just helping you see it."
-            )
-            if st.button("I'm ready to begin gently", key="liam_start"):
-                advance_liam_step(1, "GROUNDING")
-
-        elif liam_step == 1:
-            # Current Reality Check - Cash buffer
-            st.markdown("### Current Reality Check")
-            st.markdown(
-                "Before we look at anything else, let's get a gentle picture of your cash right now. "
-                "This isn't about having 'enough' — it's about seeing where you actually are so we can build from there."
-            )
-            cash_buffer = st.slider(
-                "How much cash do you have right now that isn't already spoken for by bills or essentials? "
-                "(It's completely okay if this number feels small or even zero. We're starting exactly where you are.)",
-                min_value=0,
-                max_value=10000,
-                value=st.session_state.get("liam_cash_buffer", 300),
-                step=50,
-                key="liam_cash_slider"
-            )
-            if st.button("Continue with this picture", key="liam_cash_continue"):
-                st.session_state["liam_cash_buffer"] = cash_buffer
-                st.session_state.setdefault("behavior_event_log", []).append({
-                    "category": "Attention Patterns",
-                    "description": "Viewed cash buffer in onboarding"
-                })
-                new_state = "TEACHING" if cash_buffer < 1000 else "GROUNDING"
-                advance_liam_step(2, new_state)
-
-        elif liam_step == 2:
-            # Existing Assets Discovery
-            st.markdown("### Existing Assets Discovery")
-            st.markdown(
-                "A lot of people have a little something already started — maybe a Roth IRA from a previous job, a family gift, or just a small account. "
-                "If you have one, even a small amount like $3,500, let's note it here. No shame if it's zero or unknown."
-            )
-            roth_amount = st.number_input(
-                "Roughly how much do you have in any retirement accounts (like a Roth IRA) right now?",
-                min_value=0,
-                value=st.session_state.get("liam_roth", 0),
-                step=100,
-                key="liam_roth_input"
-            )
-            if st.button("Continue", key="liam_roth_continue"):
-                st.session_state["liam_roth"] = roth_amount
-                st.session_state.setdefault("behavior_event_log", []).append({
-                    "category": "Attention Patterns",
-                    "description": "Viewed existing assets in onboarding"
-                })
-                advance_liam_step(3)
-
-        elif liam_step == 3:
-            # Priority Framing (TEACHING)
-            st.markdown("### Priority Framing")
-            cash = st.session_state.get("liam_cash_buffer", 0)
-            roth = st.session_state.get("liam_roth", 0)
-            if cash < 1000 or roth < 3500:
-                st.markdown(
-                    "Given where you're starting, it makes a lot of sense to focus first on building a small shield — "
-                    "having some cash on hand for surprises. This is smart, responsible, and the foundation everything else rests on. "
-                    "Growing an 'engine' can come after the shield feels a bit more solid."
-                )
-            else:
-                st.markdown(
-                    "You have a decent base already. We can think about both keeping the shield strong and letting the engine (your investments) grow steadily."
-                )
-            st.caption("This is just perspective to help you choose what matters most right now.")
-            if st.button("Got it — let's pick a first step", key="liam_priority_continue"):
-                st.session_state.setdefault("behavior_event_log", []).append({
-                    "category": "Attention Patterns",
-                    "description": "Viewed priority framing in onboarding"
-                })
-                advance_liam_step(4, "TEACHING")
-
-        elif liam_step == 4:
-            # First Small Commitment (REINFORCING setup)
-            st.markdown("### First Small Commitment")
-            st.markdown(
-                "Now that we've looked at the real picture together, what feels like a realistic, doable amount to set aside from your very next paycheck? "
-                "Even $20, $50, or $100 is a powerful, real start. Small consistent actions build the habit and the confidence."
-            )
-            commit_amount = st.number_input(
-                "What amount feels realistic for your first commitment from the next paycheck?",
-                min_value=0,
-                value=st.session_state.get("liam_commit", 50),
-                step=10,
-                key="liam_commit_input"
-            )
-            if st.button("This is my first step — let's lock it in", key="liam_commit_continue"):
-                st.session_state["liam_commit"] = commit_amount
-                st.session_state["reinforcing_count"] = st.session_state.get("reinforcing_count", 0) + 1
-                advance_liam_step(5, "REINFORCING")
-
-        elif liam_step == 5:
-            # Summary + Next Step
-            st.markdown("### Summary + Next Step")
-            cash = st.session_state.get("liam_cash_buffer", 0)
-            roth = st.session_state.get("liam_roth", 0)
-            commit = st.session_state.get("liam_commit", 0)
-            st.markdown(
-                f"You shared: current cash buffer around ${cash}, existing retirement ~${roth}, "
-                f"and a first commitment of ${commit} from your next paycheck."
-            )
-            st.markdown(
-                "That's a real, brave, and concrete start. You did this. I’m just helping you see it."
-            )
-            st.caption("This is how real progress begins — one clear, owned step at a time.")
-
-            if st.button("Apply my first commitment to the 1i_Bandit Sandbox Ledger", key="liam_apply_ledger"):
-                # Integrate with sandbox: add/update a CASH entry for the commitment
-                if "sandbox_ledger" not in st.session_state:
-                    st.session_state["sandbox_ledger"] = {}
-                st.session_state["sandbox_ledger"]["CASH"] = {
-                    "shares": commit,
-                    "price": 1.0,
-                    "date": "2026-06"
-                }
-                st.session_state["ledger_update_count"] = st.session_state.get("ledger_update_count", 0) + 1
-                st.session_state.setdefault("behavior_event_log", []).append({
-                    "event_type": "intentional_manual_update",
-                    "description": "Manual asset ledger updated with deliberate, self-reported values."
-                })
-                st.session_state.setdefault("behavior_event_log", []).append({
-                    "event_type": "onboarding_completion",
-                    "description": "Onboarding sequence successfully navigated; baseline portfolio parameters stabilized."
-                })
-                # v0.3: persist the change to disk
-                trigger_encrypted_disk_sync("1i_Bandit")
-                st.success(
-                    f"Perfect — your ${commit} first commitment is now reflected in the 1i_Bandit sandbox ledger as CASH. "
-                    "This is how we practice the habit safely."
-                )
-                st.session_state["liam_step"] = 6  # completed
-                st.rerun()
-
-            if st.button("Restart this onboarding journey", key="liam_restart"):
-                st.session_state["liam_step"] = 0
-                for key in ["liam_cash_buffer", "liam_roth", "liam_commit"]:
-                    if key in st.session_state:
-                        del st.session_state[key]
-                st.rerun()
-
-        if liam_step >= 6:
-            st.caption("Onboarding complete for this session. Your behavioral state is now set to REINFORCING, and the sandbox reflects your first step. The other surfaces below will respond to this.")
-
-            # v0.2 Graduation Ceremony - triggered on Liam complete + REINFORCING or disciplined ledger activity
-            reinforcing_count = st.session_state.get("reinforcing_count", 0)
-            ledger_update_count = st.session_state.get("ledger_update_count", 0)
-            if reinforcing_count > 0 or ledger_update_count > 1:
+            if not st.session_state["emotional_entry_done"]:
                 st.markdown("---")
-                st.subheader("🎉 Graduation Ceremony")
-                st.markdown("You’ve built a solid foundation here. If you ever want to explore deeper or more complex markets, we’ll help prepare you — and we’ll always be here when you need clarity and steady ground.")
+                st.subheader("What brings you here today?")
+
+                intent = st.radio(
+                    "Choose the one that feels closest:",
+                    [
+                        "Just checking in",
+                        "Check my portfolios / overall picture",
+                        "Understand a specific holding or decision",
+                        "Learn something new about my situation",
+                        "Prepare for a conversation or upcoming choice",
+                        "Something else on my mind"
+                    ],
+                    key="entry_intent"
+                )
+
+                st.markdown("### How are you feeling about money lately?")
+                feeling = st.radio(
+                    "Pick the word or phrase that fits best right now:",
+                    [
+                        "Calm and steady",
+                        "A bit uncertain or thoughtful",
+                        "Hopeful or optimistic",
+                        "Anxious or worried",
+                        "Overwhelmed",
+                        "Curious or open"
+                    ],
+                    key="entry_feeling"
+                )
+
+                driving = st.text_input(
+                    "What's driving that feeling? (optional — one sentence is plenty)",
+                    key="entry_driving",
+                    placeholder="e.g. market moves, upcoming expense, just reflecting..."
+                )
+
+                if st.button("Use this context to guide our time together", key="entry_complete"):
+                    # Pre-calibrate behavioral_state (reflective only, no diagnosis)
+                    if "Anxious" in feeling or "Overwhelmed" in feeling or "Uncertain" in feeling:
+                        st.session_state["behavioral_state"] = "CALMING"
+                    elif "Hopeful" in feeling:
+                        st.session_state["behavioral_state"] = "REINFORCING"
+                    else:
+                        st.session_state["behavioral_state"] = "NEUTRAL"
+
+                    # Capture purely reflective event (no compliance scoring)
+                    capture_event("reflective_entry", {
+                        "intent": intent,
+                        "feeling": feeling,
+                        "driving": driving or "(not shared)"
+                    })
+
+                    st.session_state["emotional_entry_done"] = True
+                    st.success("Thank you. I'll keep this in mind as we look at things together.")
+                    st.rerun()
+        else:
+            st.caption("(Emotional entry skipped — Unfiltered View active. All guidance is neutral.)")
 
         # Note: The Identity Card and Guided Question use st.subheader for their titles (H2 per locked Typography for card headers / major Friend Mode surfaces). Internal bold labels (e.g. **Primary Goals**) are H3 (Medium). All framing/provenance use st.caption (Caption per locked).
 
@@ -898,7 +830,8 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                 return
 
             # 1. Segregate the Positive Identity Spine Events
-            positive_event_types = ["onboarding_completion", "intentional_manual_update", "discipline_event", "reinforcement_event"]
+            # Only events from reflective user actions per Docs/governance/never-include.md
+            positive_event_types = ["intentional_manual_update", "discipline_event", "reinforcement_event"]
             progress_events = [e for e in session_events if e.get("event_type") in positive_event_types]
             neutral_events = [e for e in session_events if e.get("event_type") not in positive_event_types]
 
@@ -909,11 +842,7 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                     etype = event.get("event_type")
 
                     # Linguistic Translation Matrix Rules Execution
-                    if etype == "onboarding_completion":
-                        title = " Primary System Alignment"
-                        body = "Onboarding sequence successfully navigated; baseline portfolio parameters stabilized."
-                        action = "Interface posture unlocked to standard tracking metrics."
-                    elif etype == "intentional_manual_update":
+                    if etype == "intentional_manual_update":
                         title = " Structured Bookkeeping"
                         body = "Manual asset ledger updated with deliberate, self-reported values."
                         action = "Timeline lookback window adjusted to preserve tactical context."
@@ -1011,6 +940,9 @@ No adjustments are currently required. Stay with your existing plan and cadence.
             st.rerun()
 
         # Simulate Reinforcing Pattern for REINFORCING state (v0.1)
+        # Per governance: REINFORCING may only be triggered by reflective user actions
+        # (e.g. reinforcement_event, discipline_event, intentional_manual_update, or manual ledger updates).
+        # Never from onboarding, commitments, or prescriptive flows (all such paths excised).
         if st.button("Simulate Reinforcing Pattern", key="btn_simulate_reinforcing"):
             st.session_state["behavioral_state"] = "REINFORCING"
             st.session_state["reinforcing_count"] = st.session_state.get("reinforcing_count", 0) + 1
