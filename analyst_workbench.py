@@ -271,8 +271,8 @@ def main():
             write_current_behavioral_to_registry(state.selected_portfolio)
             if st.session_state.get("behavioral_state") == "NEUTRAL":
                 st.session_state.setdefault("behavior_event_log", []).append({
-                    "category": "Stability Signals",
-                    "description": "Maintained Neutral during portfolio switch"
+                    "event_type": "discipline_event",
+                    "description": "Core investment boundaries actively maintained under short-term market variance."
                 })
             select_portfolio(state, new_portfolio)
             # Router handles behavioral isolation switch
@@ -563,8 +563,8 @@ No adjustments are currently required. Stay with your existing plan and cadence.
             write_current_behavioral_to_registry(active_slot)
             if st.session_state.get("behavioral_state") == "NEUTRAL":
                 st.session_state.setdefault("behavior_event_log", []).append({
-                    "category": "Stability Signals",
-                    "description": "Maintained Neutral during portfolio switch"
+                    "event_type": "discipline_event",
+                    "description": "Core investment boundaries actively maintained under short-term market variance."
                 })
             # Keep analytical data in sync with the behavioral slot (for Hero Band + data surfaces)
             if new_slot != state.selected_portfolio:
@@ -723,8 +723,12 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                 }
                 st.session_state["ledger_update_count"] = st.session_state.get("ledger_update_count", 0) + 1
                 st.session_state.setdefault("behavior_event_log", []).append({
-                    "category": "Manual Bookkeeping",
-                    "description": f"Added CASH entry from Liam onboarding"
+                    "event_type": "intentional_manual_update",
+                    "description": "Manual asset ledger updated with deliberate, self-reported values."
+                })
+                st.session_state.setdefault("behavior_event_log", []).append({
+                    "event_type": "onboarding_completion",
+                    "description": "Onboarding sequence successfully navigated; baseline portfolio parameters stabilized."
                 })
                 # v0.3: persist the change to disk
                 trigger_encrypted_disk_sync("1i_Bandit")
@@ -774,48 +778,77 @@ No adjustments are currently required. Stay with your existing plan and cadence.
             st.info("Not support. A direct line to your system mentor for guidance on your financial path. Your request has been noted and David will respond with tailored guidance.")
         st.caption("Not support. A direct line to your system mentor for guidance on your financial path.")
 
-        # === Memory Graph Viewer v0.2 - Sovereign Transparency Deck ===
-        # Added after Sandbox per spec.
+        # === Memory Graph Viewer v0.3 - Sovereign Transparency Deck ===
+        # Per v0.3 spec: dedicated Progress & Reinforcement section for the four positive events.
+        # Placed after Sandbox / gated area.
         is_unfiltered = st.session_state.get("unfiltered_view", False)
-        events = st.session_state.get("behavior_event_log", [])
+        session_events = st.session_state.get("behavior_event_log", [])
 
         st.markdown("---")
-        st.subheader(" Memory Graph Viewer — Sovereign Transparency Deck")
 
-        if is_unfiltered:
-            st.info("Memory Viewer Disabled — Unfiltered View is active.")
-            # No events shown, no purge
-        else:
-            st.markdown("**Your Memory, Your Control**")
-            st.caption("This is your session memory. You own it. You can clear it at any time.")
+        with st.container():
+            st.subheader(" What I'm Remembering This Session")
+            st.caption("Your Memory, Your Control. This auditable log displays how your real-time interaction patterns adjust our communication parameters.")
 
-            st.markdown("**Why This Matters**")
-            st.caption("These patterns help your Companion adjust pacing and framing — never your identity.")
+            if is_unfiltered:
+                st.info("Memory-assisted guidance is currently deactivated for this session via your Unfiltered View override toggle.")
+                return
 
-            # Group events
-            categories = {
-                "Manual Bookkeeping": [],
-                "Attention Patterns": [],
-                "Stability Signals": [],
-                "Reinforcement Moments": []
-            }
+            if not session_events:
+                st.info("I haven't recorded any behavioral variations or milestones in this session yet.")
+                return
 
-            for e in events:
-                cat = e.get("category", "Attention Patterns")
-                desc = e.get("description", "")
-                if cat in categories:
-                    categories[cat].append(desc)
+            # 1. Segregate the Positive Identity Spine Events
+            positive_event_types = ["onboarding_completion", "intentional_manual_update", "discipline_event", "reinforcement_event"]
+            progress_events = [e for e in session_events if e.get("event_type") in positive_event_types]
+            neutral_events = [e for e in session_events if e.get("event_type") not in positive_event_types]
 
-            for cat, items in categories.items():
-                if items:
-                    st.markdown(f"### {cat}")
-                    for item in items:
-                        st.markdown(f"- {item}")
+            # 2. Render Dedicated Progress & Reinforcement Surface Area
+            if progress_events:
+                st.markdown("###  Progress & Reinforcement")
+                for event in progress_events:
+                    etype = event.get("event_type")
 
-            st.markdown("---")
-            if st.button("️ Clear My Memory", key="memory_purge"):
+                    # Linguistic Translation Matrix Rules Execution
+                    if etype == "onboarding_completion":
+                        title = " Primary System Alignment"
+                        body = "Onboarding sequence successfully navigated; baseline portfolio parameters stabilized."
+                        action = "Interface posture unlocked to standard tracking metrics."
+                    elif etype == "intentional_manual_update":
+                        title = " Structured Bookkeeping"
+                        body = "Manual asset ledger updated with deliberate, self-reported values."
+                        action = "Timeline lookback window adjusted to preserve tactical context."
+                    elif etype == "discipline_event":
+                        title = " Allocation Boundary Adherence"
+                        body = "Core investment boundaries actively maintained under short-term market variance."
+                        action = "Postural framing adjusted to protect long-term horizon integrity."
+                    elif etype == "reinforcement_event":
+                        title = " Strategic Milestone Consolidation"
+                        body = "Active decision parameters executed in alignment with defined 12-month goals."
+                        action = "Hero Band mutated to prioritize momentum preservation."
+                    else:
+                        continue
+
+                    # Component Typography Render Pass
+                    st.markdown(f"**{title}**")
+                    st.text(f"• Action: {body}\n• Adjustment: {action}")
+                    st.caption(f"Recorded: Live Session Context Lifecycle")
+                st.markdown("---")
+
+            # 3. Render Standard Telemetry Footprints
+            if neutral_events:
+                st.markdown("### ️ System Telemetry Tracking Logs")
+                for event in neutral_events:
+                    if event.get("event_type") == "panic_pattern":
+                        st.markdown("**Interaction Metric Notice: High Interaction Volume During Market Variance**")
+                        st.caption("Observed Signal: App layouts reviewed multiple times while valuation metrics shifted downward.")
+
+            # 4. Atomic Destruction Pipeline Gate
+            if st.button("Clear Everything I've Shared This Session", key="purge_session_v03"):
                 st.session_state["behavior_event_log"] = []
-                st.success("Your memory has been cleared. You’re in control.")
+                st.session_state["behavioral_state"] = "NEUTRAL"
+                st.session_state["active_conversational_tier"] = 1
+                st.success("Session memory wiped cleanly. Starting fresh.")
                 st.rerun()
 
         # Friend Mode color system styles (from locked Color System + Card Design)
@@ -885,8 +918,8 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                 "portfolio": state.selected_portfolio
             })
             st.session_state.setdefault("behavior_event_log", []).append({
-                "category": "Reinforcement Moments",
-                "description": "Triggered REINFORCING posture"
+                "event_type": "reinforcement_event",
+                "description": "Active decision parameters executed in alignment with defined 12-month goals."
             })
             write_current_behavioral_to_registry(get_active_slot_id())
             st.rerun()
