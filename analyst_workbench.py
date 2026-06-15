@@ -315,11 +315,6 @@ def main():
             "and never influences recommendations. `intelligence_layers_enabled` remains False. "
             "State is session-only unless you explicitly Export an Investigation Note."
         )
-        "**Architectural Guardrail**: This UI only renders data produced by the Phase 3 calibrated decision engine "
-        "and the Phase 4A–4J observational layers (narrative.py). It performs no scoring, no new rules, "
-        "and never influences recommendations. `intelligence_layers_enabled` remains False. "
-        "State is session-only unless you explicitly Export an Investigation Note."
-    )
 
     # One-time setup of demo data + session state
     if "wb_state" not in st.session_state:
