@@ -585,7 +585,7 @@ No adjustments are currently required. Stay with your existing plan and cadence.
             with band_cols[3]:
                 st.caption(f"Reason: {hero['abstention_reason']}")
 
-        st.caption(f"Hero Band • {state.selected_portfolio} • Phase 4L (Context-Aware)")
+        st.caption(f"Hero Decision Band • {state.selected_portfolio} • CALMING Posture")
     else:
         # Baseline / unfiltered / Analyst: original factual rendering
         if is_abstain:
@@ -604,7 +604,7 @@ No adjustments are currently required. Stay with your existing plan and cadence.
             with band_cols[3]:
                 st.caption(f"Reason: {hero['abstention_reason']}")
 
-        st.caption(f"Hero Band • {state.selected_portfolio} • Phase 4L")
+        st.caption(f"Hero Decision Band • {state.selected_portfolio} • CALMING Posture")
     st.divider()
 
     # This single call exercises the complete locked 4J surface (state application + all presenters)
@@ -791,25 +791,31 @@ No adjustments are currently required. Stay with your existing plan and cadence.
 
         # Note: The Identity Card and Guided Question use st.subheader for their titles (H2 per locked Typography for card headers / major Friend Mode surfaces). Internal bold labels (e.g. **Primary Goals**) are H3 (Medium). All framing/provenance use st.caption (Caption per locked).
 
+        # Gate Identity Card and Guided Question behind completed Emotional Entry (per spine order) - logic applied via the earlier gate for pacing.
+
         # Gate the remaining Friend surfaces behind completed Emotional Entry for sequential, calm pacing.
-        # (Request block and Memory Graph appear only after the user has shared context or in Unfiltered View.)
+        # (Request block, Memory Graph, Identity Card, Guided Question appear only after the user has shared context or in Unfiltered View.)
         if st.session_state.get("emotional_entry_done", False) or st.session_state.get("unfiltered_view", False):
+            # SURFACE 1.5: THE DYNAMIC ONBOARDING STATUS RIBBON (Collapsed Banner)
+            st.markdown("---")
+            st.caption("Focus: Understand My Allocation Setup  |   Pacing: CALMING Mode Active")
+
             # === v0.2 Gated Ticker Request (Surface 3.6) - inside Buddy Sandbox / Manual Ledger area ===
             # Prevents free-form search, routes to human (David). Clear pause and boundary.
             st.markdown("---")
             st.subheader("➕ Request an Asset Addition")
-            st.markdown("We focus only on assets with strong volume history. This keeps the experience clear and reduces noise.")
+            st.markdown("I keep the list focused on assets with a clear trading history so the experience stays steady and easy to follow.")
             ticker_request = st.text_input("Ticker symbol to request (e.g. NEWASSET)", key="gated_ticker_input")
-            if st.button("Submit Request to David", key="gated_ticker_submit"):
+            if st.button("Send to David for a look", key="gated_ticker_submit"):
                 if ticker_request:
                     requests = st.session_state.setdefault("ticker_requests", [])
                     requests.append(ticker_request.upper())
                     st.session_state["ticker_requests"] = requests
                     st.success("Request submitted to David. He will personally review the volume profile with you.")
-            st.caption("This sends a direct request to David. He will personally review the volume profile with you.")
+            st.caption("If you want another asset reviewed, I’ll take a look and help you think it through.")
 
             # Request Help From David - direct human bridge, low-prominence in sandbox area
-            if st.button("Request Help From David", key="request_help_david"):
+            if st.button("Ask David for guidance", key="request_help_david"):
                 st.info("A direct line to David for guidance on your financial path. Your request has been noted.")
             st.caption("A direct line to David for guidance on your financial path.")
 
@@ -885,15 +891,42 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                     st.rerun()
 
         # Friend Mode color system styles (from locked Color System + Card Design)
-        # Applied to the .identity-card-wrapper class we inject around the Identity Card.
+        # Warmer, calmer palette for Friend Mode (Phase 4 palette redesign in progress per #24).
+        # Refined v1.2: #f7f3ee base, soft cards, low-stress buttons, warm non-clinical accents.
         st.markdown("""
 <style>
-.identity-card-wrapper {
-    border: 4px solid #4A90E2 !important;
-    background-color: #E8F1FF55 !important;
-    border-radius: 12px !important;
-    padding: 1.5rem !important;
-    box-shadow: 0 0 12px rgba(74, 144, 226, 0.4) !important;
+/* Base canvas */
+.stApp {
+    background-color: #f7f3ee;
+    color: #2c2520;
+}
+
+/* Card containers */
+div[data-testid="stVerticalBlock"] > div {
+    background-color: #ffffff;
+    border-radius: 10px;
+    padding: 28px;
+    border: 1px solid #e4ddd3;
+    box-shadow: 0 1px 4px rgba(44, 37, 32, 0.06);
+}
+
+/* Buttons */
+.stButton > button {
+    background-color: #efe9e2;
+    color: #2c2520;
+    border: 1px solid #d8cfc3;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.stButton > button:hover {
+    background-color: #e7dfd7;
+    border-color: #cfc5b8;
+}
+
+.stButton > button:active {
+    background-color: #ded6cd;
+    border-color: #c7bdb0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -995,11 +1028,12 @@ No adjustments are currently required. Stay with your existing plan and cadence.
         if continuity_header:
             st.caption(continuity_header)
 
-        # === Friend Mode Identity Card ===
-        # Now passes the (potentially edited) profile so it reflects user input.
-        identity_card = get_friend_identity_card_data(
-            state.selected_portfolio, registry, friend_profile=current_profile
-        )
+        if st.session_state.get("emotional_entry_done", False) or st.session_state.get("unfiltered_view", False):
+            # === Friend Mode Identity Card ===
+            # Now passes the (potentially edited) profile so it reflects user input.
+            identity_card = get_friend_identity_card_data(
+                state.selected_portfolio, registry, friend_profile=current_profile
+            )
 
         if identity_framing:
             identity_card["framing"] = identity_framing
@@ -1041,29 +1075,32 @@ No adjustments are currently required. Stay with your existing plan and cadence.
 
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # === First Guided Question ===
-        # Now reacts to the live-edited profile.
-        guided = get_first_guided_question(
-            state.selected_portfolio, registry, lifecycles, snapshot, friend_profile=current_profile
-        )
+        if st.session_state.get("emotional_entry_done", False) or st.session_state.get("unfiltered_view", False):
+            # === First Guided Question ===
+            # Now reacts to the live-edited profile.
+            guided = get_first_guided_question(
+                state.selected_portfolio, registry, lifecycles, snapshot, friend_profile=current_profile
+            )
 
-        if guided_question:
-            guided["question"] = guided_question
-        if guided_rationale:
-            guided["rationale"] = guided_rationale
+            if guided_question:
+                guided["question"] = guided_question
+            if guided_rationale:
+                guided["rationale"] = guided_rationale
 
-        with st.container(border=True):
-            st.subheader("Guided Question")
-            st.markdown(f"> {guided.get('question', '')}")
-            st.caption(guided.get("rationale", ""))
-            signals = guided.get("profile_signals_used", [])
-            if signals:
-                st.caption("Drawn from: " + ", ".join(signals))
-            st.caption("This is the kind of question I will proactively bring forward for you.")
+            with st.container(border=True):
+                st.subheader("Guided Question")
+                st.markdown(f"> {guided.get('question', '')}")
+                st.caption(guided.get("rationale", ""))
+                signals = guided.get("profile_signals_used", [])
+                if signals:
+                    st.caption("Drawn from: " + ", ".join(signals))
+                st.caption("This is the kind of question I will proactively bring forward for you.")
 
-        if explain_text:
-            with st.expander("Why am I seeing this?"):
-                st.caption(explain_text)
+            if explain_text:
+                with st.expander("Why am I seeing this?"):
+                    st.caption(explain_text)
+
+        # end gate for Identity/Guided (after entry)
 
         # === Second Guided Question (Follow-Up) — micro-chunk v0.1 ===
         # Per spec: add follow-up button under first Guided Question.
@@ -1227,7 +1264,7 @@ No adjustments are currently required. Stay with your existing plan and cadence.
 
         st.markdown("---")
         with st.container():
-            st.subheader(" Manual Ledger (Sandbox)")
+            st.subheader("Sandbox Active Ledger")
             st.caption(f"Buddy: 1i_Bandit | Snapshot Base: December 2025. This is a deterministic testing environment with manual upkeep only.")
             st.markdown(f"**Current View Window:** `{horizon_label}`")
             st.caption(f" Companion choice: {horizon_note}")
