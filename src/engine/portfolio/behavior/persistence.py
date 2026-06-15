@@ -23,20 +23,32 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 
+try:
+    import streamlit as st
+except ImportError:
+    st = None  # type: ignore
+
 # =============================================================================
 # Application-derived key (lightweight for v0.3 demo)
 # In a real deployment this should come from a secure source / user secret.
-# For now we use a fixed key so the sandbox state is portable across runs.
-# Fernet key must be 32 urlsafe base64 bytes.
+# For now we use a fixed key (or BANDIT_FERNET_KEY env) so the sandbox state
+# is portable across runs. Fernet key must be 32 urlsafe base64 bytes.
 # =============================================================================
-# Generated once for this demo (valid 32-byte urlsafe base64).
-# Replace in production with proper key management.
-_FERNET_KEY = b'Ye07qOYsKsHeTl701pNoqZEtUyELTq6YpQPRfd8gJ4k='
+# To override in Cloud: set BANDIT_FERNET_KEY env var (recommended for real use).
+# The fallback below is a valid generated key for the demo/sandbox.
+_FERNET_KEY = os.environ.get("BANDIT_FERNET_KEY")
+if _FERNET_KEY:
+    if isinstance(_FERNET_KEY, str):
+        _FERNET_KEY = _FERNET_KEY.encode()
+else:
+    # Valid 32-byte urlsafe base64 key (generated for this demo)
+    _FERNET_KEY = b'Ye07qOYsKsHeTl701pNoqZEtUyELTq6YpQPRfd8gJ4k='
 _FERNET = Fernet(_FERNET_KEY)
 
 
@@ -185,13 +197,18 @@ def initialize_or_load_buddy_session(buddy_id: str = "1i_Bandit") -> None:
                 },
             }
 
+        last_seen = datetime.utcnow().isoformat()
+        st.session_state["last_seen_timestamp"] = last_seen
+
         # Immediately persist the fresh baseline so it survives the first refresh
         manifest = {
             "ledger": baseline_ledger,
             "unfiltered_view": False,
+            "last_seen": last_seen,
             "registry": st.session_state["portfolio_behavioral_registry"].get(buddy_id, {}),
         }
         save_buddy_state_to_disk(buddy_id, manifest)
+        st.session_state["show_return_home"] = False
     else:
         # Valid persisted state found – restore what we care about for the sandbox
         st.session_state["sandbox_ledger"] = manifest.get("ledger", {})
@@ -203,6 +220,18 @@ def initialize_or_load_buddy_session(buddy_id: str = "1i_Bandit") -> None:
             st.session_state["portfolio_behavioral_registry"][buddy_id].update(
                 manifest["registry"]
             )
+
+        last_seen_str = manifest.get("last_seen")
+        st.session_state["last_seen_timestamp"] = datetime.utcnow().isoformat()
+        show_return = False
+        if last_seen_str:
+            try:
+                last = datetime.fromisoformat(last_seen_str)
+                if (datetime.utcnow() - last).days > 7:
+                    show_return = True
+            except:
+                pass
+        st.session_state["show_return_home"] = show_return
 
 
 def trigger_encrypted_disk_sync(buddy_id: str = "1i_Bandit") -> bool:
@@ -218,6 +247,7 @@ def trigger_encrypted_disk_sync(buddy_id: str = "1i_Bandit") -> bool:
     manifest = {
         "ledger": st.session_state["sandbox_ledger"],
         "unfiltered_view": st.session_state.get("unfiltered_view", False),
+        "last_seen": st.session_state.get("last_seen_timestamp", datetime.utcnow().isoformat()),
     }
 
     # Include the sandbox slice of the registry if it exists
