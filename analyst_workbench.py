@@ -921,6 +921,7 @@ No adjustments are currently required. Stay with your existing plan and cadence.
         # Friend Mode color system styles (from locked Color System + Card Design)
         # Warmer, calmer palette for Friend Mode (Phase 4 palette redesign in progress per #24).
         # Refined v1.2: #f7f3ee base, soft cards, low-stress buttons, warm non-clinical accents.
+        # (Applies only when the Friend branch runs — i.e., once the deployment guard is active.)
         st.markdown("""
 <style>
 /* Base canvas */
