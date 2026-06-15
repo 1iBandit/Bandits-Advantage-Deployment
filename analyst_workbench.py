@@ -764,7 +764,7 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                     placeholder="e.g. market moves, upcoming expense, just reflecting..."
                 )
 
-                if st.button("Use this context to guide our time together", key="entry_complete"):
+                if st.button("Continue", key="entry_complete"):
                     # Pre-calibrate behavioral_state (reflective only, no diagnosis)
                     if "Anxious" in feeling or "Overwhelmed" in feeling or "Uncertain" in feeling:
                         st.session_state["behavioral_state"] = "CALMING"
@@ -783,100 +783,106 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                     st.session_state["emotional_entry_done"] = True
                     st.success("Thank you. I'll keep this in mind as we look at things together.")
                     st.rerun()
+
+            # After Emotional Entry is complete, show the rest of the Friend surfaces
+            # (Request block, Memory Graph, etc.) so the flow feels sequential and calm.
         else:
             st.caption("(Emotional entry skipped — Unfiltered View active. All guidance is neutral.)")
 
         # Note: The Identity Card and Guided Question use st.subheader for their titles (H2 per locked Typography for card headers / major Friend Mode surfaces). Internal bold labels (e.g. **Primary Goals**) are H3 (Medium). All framing/provenance use st.caption (Caption per locked).
 
-        # === v0.2 Gated Ticker Request (Surface 3.6) - inside Buddy Sandbox / Manual Ledger area ===
-        # Prevents free-form search, routes to human (David). Clear pause and boundary.
-        st.markdown("---")
-        st.subheader("➕ Request an Asset Addition")
-        st.markdown("Our system stays intentionally focused on assets with strong volume history. This protects you from thinly traded or highly speculative names.")
-        ticker_request = st.text_input("Ticker symbol to request (e.g. NEWASSET)", key="gated_ticker_input")
-        if st.button("Submit Request to David", key="gated_ticker_submit"):
-            if ticker_request:
-                requests = st.session_state.setdefault("ticker_requests", [])
-                requests.append(ticker_request.upper())
-                st.session_state["ticker_requests"] = requests
-                st.success("Request submitted to David. He will personally review the volume profile with you.")
-        st.caption("This sends a direct request to your system mentor. David will personally review the volume profile with you.")
+        # Gate the remaining Friend surfaces behind completed Emotional Entry for sequential, calm pacing.
+        # (Request block and Memory Graph appear only after the user has shared context or in Unfiltered View.)
+        if st.session_state.get("emotional_entry_done", False) or st.session_state.get("unfiltered_view", False):
+            # === v0.2 Gated Ticker Request (Surface 3.6) - inside Buddy Sandbox / Manual Ledger area ===
+            # Prevents free-form search, routes to human (David). Clear pause and boundary.
+            st.markdown("---")
+            st.subheader("➕ Request an Asset Addition")
+            st.markdown("We focus only on assets with strong volume history. This keeps the experience clear and reduces noise.")
+            ticker_request = st.text_input("Ticker symbol to request (e.g. NEWASSET)", key="gated_ticker_input")
+            if st.button("Submit Request to David", key="gated_ticker_submit"):
+                if ticker_request:
+                    requests = st.session_state.setdefault("ticker_requests", [])
+                    requests.append(ticker_request.upper())
+                    st.session_state["ticker_requests"] = requests
+                    st.success("Request submitted to David. He will personally review the volume profile with you.")
+            st.caption("This sends a direct request to David. He will personally review the volume profile with you.")
 
-        # Request Help From David - direct human bridge, low-prominence in sandbox area
-        if st.button("Request Help From David", key="request_help_david"):
-            st.info("Not support. A direct line to your system mentor for guidance on your financial path. Your request has been noted and David will respond with tailored guidance.")
-        st.caption("Not support. A direct line to your system mentor for guidance on your financial path.")
+            # Request Help From David - direct human bridge, low-prominence in sandbox area
+            if st.button("Request Help From David", key="request_help_david"):
+                st.info("A direct line to David for guidance on your financial path. Your request has been noted.")
+            st.caption("A direct line to David for guidance on your financial path.")
 
-        # === Memory Graph Viewer v0.3 - Sovereign Transparency Deck ===
-        # Per v0.3 spec: dedicated Progress & Reinforcement section for the four positive events.
-        # Placed after Sandbox / gated area.
-        is_unfiltered = st.session_state.get("unfiltered_view", False)
-        session_events = st.session_state.get("behavior_event_log", [])
+            # === Memory Graph Viewer v0.3 - Sovereign Transparency Deck ===
+            # Per v0.3 spec: dedicated Progress & Reinforcement section for the four positive events.
+            # Placed after Sandbox / gated area.
+            is_unfiltered = st.session_state.get("unfiltered_view", False)
+            session_events = st.session_state.get("behavior_event_log", [])
 
-        st.markdown("---")
+            st.markdown("---")
 
-        with st.container():
-            st.subheader(" What I'm Remembering This Session")
-            st.caption("Your Memory, Your Control. This auditable log displays how your real-time interaction patterns adjust our communication parameters.")
+            with st.container():
+                st.subheader(" What I'm Remembering This Session")
+                st.caption("Your Memory, Your Control. This auditable log displays how your real-time interaction patterns adjust our communication parameters.")
 
-            if is_unfiltered:
-                st.info("Memory-assisted guidance is currently deactivated for this session via your Unfiltered View override toggle.")
-                return
+                if is_unfiltered:
+                    st.info("Memory-assisted guidance is currently deactivated for this session via your Unfiltered View override toggle.")
+                    return
 
-            if not session_events:
-                st.info("I haven't recorded any behavioral variations or milestones in this session yet.")
-                return
+                if not session_events:
+                    st.info("I haven't recorded any behavioral variations or milestones in this session yet.")
+                    return
 
-            # 1. Segregate the Positive Identity Spine Events
-            # Only events from reflective user actions per Docs/governance/never-include.md
-            positive_event_types = ["intentional_manual_update", "discipline_event", "reinforcement_event"]
-            progress_events = [e for e in session_events if e.get("event_type") in positive_event_types]
-            neutral_events = [e for e in session_events if e.get("event_type") not in positive_event_types]
+                # 1. Segregate the Positive Identity Spine Events
+                # Only events from reflective user actions per Docs/governance/never-include.md
+                positive_event_types = ["intentional_manual_update", "discipline_event", "reinforcement_event"]
+                progress_events = [e for e in session_events if e.get("event_type") in positive_event_types]
+                neutral_events = [e for e in session_events if e.get("event_type") not in positive_event_types]
 
-            # 2. Render Dedicated Progress & Reinforcement Surface Area
-            if progress_events:
-                st.markdown("###  Progress & Reinforcement")
-                for event in progress_events:
-                    etype = event.get("event_type")
+                # 2. Render Dedicated Progress & Reinforcement Surface Area
+                if progress_events:
+                    st.markdown("###  Progress & Reinforcement")
+                    for event in progress_events:
+                        etype = event.get("event_type")
 
-                    # Linguistic Translation Matrix Rules Execution
-                    if etype == "intentional_manual_update":
-                        title = " Structured Bookkeeping"
-                        body = "Manual asset ledger updated with deliberate, self-reported values."
-                        action = "Timeline lookback window adjusted to preserve tactical context."
-                    elif etype == "discipline_event":
-                        title = " Allocation Boundary Adherence"
-                        body = "Core investment boundaries actively maintained under short-term market variance."
-                        action = "Postural framing adjusted to protect long-term horizon integrity."
-                    elif etype == "reinforcement_event":
-                        title = " Strategic Milestone Consolidation"
-                        body = "Active decision parameters executed in alignment with defined 12-month goals."
-                        action = "Hero Band mutated to prioritize momentum preservation."
-                    else:
-                        continue
+                        # Linguistic Translation Matrix Rules Execution
+                        if etype == "intentional_manual_update":
+                            title = " Structured Bookkeeping"
+                            body = "Manual asset ledger updated with deliberate, self-reported values."
+                            action = "Timeline lookback window adjusted to preserve tactical context."
+                        elif etype == "discipline_event":
+                            title = " Allocation Boundary Adherence"
+                            body = "Core investment boundaries actively maintained under short-term market variance."
+                            action = "Postural framing adjusted to protect long-term horizon integrity."
+                        elif etype == "reinforcement_event":
+                            title = " Strategic Milestone Consolidation"
+                            body = "Active decision parameters executed in alignment with defined 12-month goals."
+                            action = "Hero Band mutated to prioritize momentum preservation."
+                        else:
+                            continue
 
-                    # Component Typography Render Pass
-                    st.markdown(f"**{title}**")
-                    st.text(f"• Action: {body}\n• Adjustment: {action}")
-                    st.caption(f"Recorded: Live Session Context Lifecycle")
-                st.markdown("---")
-                st.caption("Why you’re seeing this: These are actions you took that align with stability and discipline. The Companion uses them only to adjust pacing and framing.")
+                        # Component Typography Render Pass
+                        st.markdown(f"**{title}**")
+                        st.text(f"• Action: {body}\n• Adjustment: {action}")
+                        st.caption(f"Recorded: Live Session Context Lifecycle")
+                    st.markdown("---")
+                    st.caption("Why you’re seeing this: These are actions you took that align with stability and discipline. The Companion uses them only to adjust pacing and framing.")
 
-            # 3. Render Standard Telemetry Footprints
-            if neutral_events:
-                st.markdown("### ️ System Telemetry Tracking Logs")
-                for event in neutral_events:
-                    if event.get("event_type") == "panic_pattern":
-                        st.markdown("**Interaction Metric Notice: High Interaction Volume During Market Variance**")
-                        st.caption("Observed Signal: App layouts reviewed multiple times while valuation metrics shifted downward.")
+                # 3. Render Standard Telemetry Footprints
+                if neutral_events:
+                    st.markdown("### ️ System Telemetry Tracking Logs")
+                    for event in neutral_events:
+                        if event.get("event_type") == "panic_pattern":
+                            st.markdown("**Interaction Metric Notice: High Interaction Volume During Market Variance**")
+                            st.caption("Observed Signal: App layouts reviewed multiple times while valuation metrics shifted downward.")
 
-            # 4. Atomic Destruction Pipeline Gate
-            if st.button("Clear Everything I've Shared This Session", key="purge_session_v03"):
-                st.session_state["behavior_event_log"] = []
-                st.session_state["behavioral_state"] = "NEUTRAL"
-                st.session_state["active_conversational_tier"] = 1
-                st.success("Session memory wiped cleanly. Starting fresh.")
-                st.rerun()
+                # 4. Atomic Destruction Pipeline Gate
+                if st.button("Clear Everything I've Shared This Session", key="purge_session_v03"):
+                    st.session_state["behavior_event_log"] = []
+                    st.session_state["behavioral_state"] = "NEUTRAL"
+                    st.session_state["active_conversational_tier"] = 1
+                    st.success("Session memory wiped cleanly. Starting fresh.")
+                    st.rerun()
 
         # Friend Mode color system styles (from locked Color System + Card Design)
         # Applied to the .identity-card-wrapper class we inject around the Identity Card.
