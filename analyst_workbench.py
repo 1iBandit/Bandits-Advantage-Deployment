@@ -318,7 +318,9 @@ def main():
         )
 
     # One-time setup of demo data + session state
-    if "wb_state" not in st.session_state:
+    # Robust init: recreate if missing or if the object is from a stale class definition
+    # (common after code changes / redeploys in Streamlit, as session_state holds pickled instances).
+    if "wb_state" not in st.session_state or not isinstance(st.session_state.wb_state, WorkbenchSessionState):
         st.session_state.wb_state = WorkbenchSessionState("P001_GROWTH")
         st.session_state.demo_data = setup_demo_data()
         st.session_state.last_exported_note = None
