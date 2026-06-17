@@ -69,8 +69,29 @@ def pull_symbol(
     df: pd.DataFrame = fetched["data"]
     provider_name = fetched.get("source", provider.name)
 
-    # Write / overwrite
+    # Write / overwrite (legacy)
     df.to_csv(file_path, index=False)
+
+    # Dual-write to SOT raw (prices_raw) — part of migration F + production backbone
+    try:
+        from src.sot.migrate import dual_write_price
+        # Normalize df rows for SOT
+        rows = []
+        for _, r in df.iterrows():
+            rows.append({
+                "date": str(r.get("date") or r.get("Date", "")),
+                "open": r.get("open") or r.get("Open"),
+                "high": r.get("high") or r.get("High"),
+                "low": r.get("low") or r.get("Low"),
+                "close": r.get("close") or r.get("Close"),
+                "volume": r.get("volume") or r.get("Volume"),
+                "adj_close": r.get("adj_close") or r.get("Adj Close"),
+                "source": provider_name,
+            })
+        dual_write_price(symbol, rows)
+    except Exception:
+        # Non-fatal — legacy path continues
+        pass
 
     completed_at = datetime.utcnow()
     files_written = [str(file_path)]

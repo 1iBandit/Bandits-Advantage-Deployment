@@ -2,6 +2,10 @@
 # Thin entry point for Streamlit Cloud (recommended in DEPLOYMENT.md).
 # Public deployment renders *only* Friend Mode (the calm companion experience).
 # Analyst Workbench surfaces are available locally for personal analysis use only.
+#
+# SOT v0.2: Reads ONLY from data/sot/semantic/* (behavior_semantic drives gating).
+# Raw SOT is blocked when FRIEND_OF_1IBANDIT_DEPLOYMENT=1.
+# Run nightly_materializer after acquisition for fresh Excel/Power BI/Friend views.
 import os
 import sys
 import runpy

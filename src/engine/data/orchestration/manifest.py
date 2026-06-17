@@ -73,6 +73,14 @@ def create_orchestration_manifest(
         json.dump(manifest, f, indent=2, default=str)
 
     manifest["_manifest_path"] = str(manifest_path)  # convenience for callers
+
+    # Dual-write to SOT orchestration_manifests Parquet
+    try:
+        from src.sot.raw import write_orchestration_manifest_parquet
+        write_orchestration_manifest_parquet(manifest)
+    except Exception:
+        pass
+
     return manifest
 
 

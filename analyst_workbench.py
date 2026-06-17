@@ -91,6 +91,15 @@ from src.engine.portfolio.behavior import (
     initialize_or_load_buddy_session,
     trigger_encrypted_disk_sync,
 )
+
+# SOT v0.2 (A/B/H) — semantic layer for gating + raw writers (raw access auto-blocks in Friend deployment)
+try:
+    from src.sot.semantic import get_gating_state, update_behavior_semantic_from_event
+    from src.sot import is_friend_deployment
+except Exception:
+    get_gating_state = None
+    update_behavior_semantic_from_event = None
+    def is_friend_deployment(): return os.environ.get("FRIEND_OF_1IBANDIT_DEPLOYMENT", "0") == "1"
 from src.engine.portfolio.workbench_ui import (
     WorkbenchSessionState,
     render_full_workbench_with_flows,
@@ -273,11 +282,16 @@ def main():
             "Then run: streamlit run analyst_workbench.py"
         )
 
+    # Deployment guard (FRIEND_OF_1IBANDIT_DEPLOYMENT)
+    # Use live function (SOT also enforces raw blocks)
+    _is_friend = is_friend_deployment() if callable(is_friend_deployment) else (os.environ.get("FRIEND_OF_1IBANDIT_DEPLOYMENT", "0") == "1")
+    is_friend_deployment = _is_friend  # for the rest of main() logic
+
     # Deployment guard (canonical refinement loop, 2026-06-15)
     # When FRIEND_OF_1IBANDIT_DEPLOYMENT=1 (set by the public thin wrapper),
     # force pure Friend Mode only. Analyst Workbench surfaces remain available
     # in local / personal analysis environments.
-    is_friend_deployment = os.environ.get("FRIEND_OF_1IBANDIT_DEPLOYMENT", "0") == "1"
+    # SOT v0.2: raw access blocked inside src/sot/raw.py when flag is set.
 
     if is_friend_deployment:
         page_title = "Friend of 1iBandit"
@@ -299,6 +313,17 @@ def main():
 
     st.title(top_title)
     st.caption(top_caption)
+
+    # Early warm palette for Friend (ensures calm #f7f3ee before any content renders)
+    if is_friend_deployment:
+        st.markdown("""
+<style>
+.stApp { background-color: #f7f3ee; color: #2c2520; }
+div[data-testid="stVerticalBlock"] > div { background-color: #ffffff; border-radius: 10px; padding: 28px; border: 1px solid #e4ddd3; }
+.stButton > button { background-color: #efe9e2; color: #2c2520; border: 1px solid #d8cfc3; border-radius: 6px; }
+.stButton > button:hover { background-color: #e7dfd7; }
+</style>
+""", unsafe_allow_html=True)
 
     # Permanent guardrail banner (matches the locked contracts)
     # In pure Friend deployment we keep a lighter version to preserve the architectural promise
@@ -360,16 +385,17 @@ def main():
             switch_to_slot(new_portfolio)
             # Note: switch_to_slot does st.rerun() internally for full surface teardown
 
-        time_window = st.radio(
-            "Temporal Window (4J Progressive Disclosure)",
-            options=["full", "recent"],
-            index=0 if state.time_window == "full" else 1,
-            horizontal=True,
-            key="sb_time",
-        )
-        if time_window != state.time_window:
-            set_time_window(state, time_window)
-            st.rerun()
+        if not is_friend_deployment:
+            time_window = st.radio(
+                "Temporal Window (4J Progressive Disclosure)",
+                options=["full", "recent"],
+                index=0 if state.time_window == "full" else 1,
+                horizontal=True,
+                key="sb_time",
+            )
+            if time_window != state.time_window:
+                set_time_window(state, time_window)
+                st.rerun()
 
         st.divider()
 
@@ -622,15 +648,77 @@ No adjustments are currently required. Stay with your existing plan and cadence.
     if mode == "Friend (4K)":
         # === Friend Mode (4K child spec) ===
         # Only the allowed elements: rationale, Why bullets, Show More, Export
-        # Uses locked 4K presenters. Hero Band is already rendered above.
+        # Uses locked 4K presenters. Hero Decision Band is always shown above.
         #
         # Post-2026-06-15 boundary: Emotional Entry v0.1 is now the reflective front door (Phase 1).
         # Personal Context follows (Phase 2). Portfolio Intake (Phase 3).
         # No prescriptive onboarding. REINFORCING and other states only from allowed reflective triggers.
         # See Docs/governance/never-include.md for permanent rules.
+        #
+        # SOT v0.2 alignment: All post-entry surfaces gated behind emotional_entry_done.
+        # Thin deployment (FRIEND_OF_1IBANDIT_DEPLOYMENT) forces pure Friend Mode.
         st.divider()
         st.subheader("Friend Mode (4K)")  # H2 per locked Typography for mode headers
         st.caption("Guided companion experience powered by your Friend Profile.")  # Caption per hierarchy
+
+        # Friend Mode palette injection (warm, calm, non-clinical)
+        # Called early so styles apply to all Friend surfaces.
+        # This is the v1.2 scaffold; will be refined in visual pass.
+        st.markdown("""
+<style>
+/* Base canvas */
+.stApp {
+    background-color: #f7f3ee;
+    color: #2c2520;
+}
+
+/* Card containers */
+div[data-testid="stVerticalBlock"] > div {
+    background-color: #ffffff;
+    border-radius: 10px;
+    padding: 28px;
+    border: 1px solid #e4ddd3;
+    box-shadow: 0 1px 4px rgba(44, 37, 32, 0.06);
+}
+
+/* Buttons */
+.stButton > button {
+    background-color: #efe9e2;
+    color: #2c2520;
+    border: 1px solid #d8cfc3;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.stButton > button:hover {
+    background-color: #e7dfd7;
+    border-color: #cfc5b8;
+}
+
+.stButton > button:active {
+    background-color: #ded6cd;
+    border-color: #c7bdb0;
+}
+</style>
+""", unsafe_allow_html=True)
+
+        # === Contextual Gating Helper (Workstream H) ===
+        # Single source: get_gating_state (behavior_semantic parquet)
+        def should_show_post_entry_content() -> bool:
+            """Centralized gating for Request, Memory, Identity, Guided, Return Home etc.
+            Fully semantic driven. Thin deployments read ONLY the parquet.
+            """
+            if get_gating_state is not None:
+                try:
+                    g = get_gating_state("1i_Bandit")
+                    if g.get("unfiltered_view", False) or g.get("emotional_entry_done", False):
+                        return True
+                except Exception:
+                    pass
+            # Session fallback (for interactive before snapshot write)
+            if st.session_state.get("unfiltered_view", False):
+                return True
+            return bool(st.session_state.get("emotional_entry_done", False))
 
         # === v0.2 Continuity Header with Portfolio Router (Surface 1) ===
         active_slot = get_active_slot_id()
@@ -640,19 +728,28 @@ No adjustments are currently required. Stay with your existing plan and cadence.
         st.markdown(
             f"**Buddy: David** | Active: **{display_name} ({idx}/{total})**"
         )
+        # Semantic snapshot version (item 2) — thin deployment always knows which snapshot it is reading
+        if get_gating_state is not None:
+            try:
+                g = get_gating_state("1i_Bandit")
+                ver = g.get("semantic_snapshot_version") or "unknown"
+                st.caption(f"Semantic snapshot: {ver} (sot {g.get('sot_schema_version', '0.2.0')})")
+            except Exception:
+                pass
         # v0.2 "Why We Keep It Tight" explainer - subtle in Continuity Header
         st.caption("Why We Keep It Tight: We focus on assets with real trading volume and history. This keeps the experience clear and protects you from noise that can trigger impulsive decisions.")
 
-        # v0.3 Guidance Level toggle (demo for tonight - Quiet/Standard/Companion)
-        guidance_level = st.radio(
-            "Guidance Level (demo)",
-            ["Quiet", "Standard", "Companion"],
-            index=1,
-            horizontal=True,
-            key="guidance_level"
-        )
-        if guidance_level == "Quiet":
-            st.caption("(Quiet mode: minimal narration for review)")
+        # v0.3 Guidance Level toggle (demo) — suppressed in pure Friend deployment for clean calm companion view
+        if not is_friend_deployment:
+            guidance_level = st.radio(
+                "Guidance Level (demo)",
+                ["Quiet", "Standard", "Companion"],
+                index=1,
+                horizontal=True,
+                key="guidance_level"
+            )
+            if guidance_level == "Quiet":
+                st.caption("(Quiet mode: minimal narration for review)")
 
         # Lightweight switch affordance (full isolation + teardown on change)
         # The sidebar also has the selector; this header makes the behavioral context the north star.
@@ -686,7 +783,16 @@ No adjustments are currently required. Stay with your existing plan and cadence.
         trigger_encrypted_disk_sync("1i_Bandit")
 
         # === Return Home Experience v0.1 (if returning after >7 days) ===
-        if st.session_state.get("show_return_home", False):
+        # Consult semantic gating (Workstream H)
+        show_return = st.session_state.get("show_return_home", False)
+        if get_gating_state is not None:
+            try:
+                g = get_gating_state("1i_Bandit")
+                if g.get("return_home_shown"):
+                    show_return = True
+            except Exception:
+                pass
+        if show_return:
             with st.container():
                 st.markdown("**Welcome back.**")
                 st.caption("It’s good to see you again.")
@@ -727,16 +833,32 @@ No adjustments are currently required. Stay with your existing plan and cadence.
             with col1:
                 if st.button("Pick up where I left off", key="soft_pickup"):
                     # Proceed to the post-entry spine (gated surfaces will show)
-                    pass
+                    # Mark soft re-entry in semantic layer for Workstream H
+                    if update_behavior_semantic_from_event is not None:
+                        try:
+                            update_behavior_semantic_from_event("1i_Bandit", "soft_reentry_pickup", {})
+                        except Exception:
+                            pass
+                    st.session_state["soft_reentry"] = True
             with col2:
                 if st.button("Start fresh", key="soft_fresh"):
                     st.session_state["emotional_entry_done"] = False
                     st.session_state["onboarding_completed"] = False
+                    if update_behavior_semantic_from_event is not None:
+                        try:
+                            update_behavior_semantic_from_event("1i_Bandit", "soft_reentry_fresh", {})
+                        except Exception:
+                            pass
                     st.rerun()
             with col3:
                 if st.button("Just show me my accounts", key="soft_accounts"):
                     # Proceed to spine (ledger will be visible early in gated content)
                     st.session_state["soft_show_ledger"] = True
+                    if update_behavior_semantic_from_event is not None:
+                        try:
+                            update_behavior_semantic_from_event("1i_Bandit", "soft_reentry_accounts", {})
+                        except Exception:
+                            pass
                     st.rerun()
 
         # === Emotional Entry v0.1 (new non-prescriptive front door) ===
@@ -745,6 +867,24 @@ No adjustments are currently required. Stay with your existing plan and cadence.
         # Never: numbers, commitments, targets, "first steps", ledger mutations, habit language, or performance framing.
         # Placed early in Friend Mode after Return Home (if any) so the Companion can respond appropriately from the start.
         # Respects Unfiltered View (bypass or minimal) and existing router/persistence/sandbox.
+        #
+        # SOT v0.2 (H): Load from single contract get_gating_state (behavior_semantic)
+        # Drives the entire spine. No re-execution for thin deployment.
+        gating = {}
+        if get_gating_state is not None:
+            try:
+                from src.sot.semantic import load_gating_into_session
+                gating = load_gating_into_session("1i_Bandit") or get_gating_state("1i_Bandit")
+            except Exception:
+                try:
+                    gating = get_gating_state("1i_Bandit")
+                except Exception:
+                    pass
+
+        # Backfill session from authoritative semantic (for Return Home, soft etc.)
+        for flag in ["emotional_entry_done", "onboarding_completed", "show_return_home", "unfiltered_view", "soft_reentry"]:
+            if flag in gating and gating[flag]:
+                st.session_state[flag] = True
 
         if not st.session_state.get("unfiltered_view", False):
             if "emotional_entry_done" not in st.session_state:
@@ -808,6 +948,19 @@ No adjustments are currently required. Stay with your existing plan and cadence.
                     st.session_state["onboarding_focus"] = intent
                     st.success("Thank you. I'll keep this in mind as we look at things together.")
                     trigger_encrypted_disk_sync("1i_Bandit")
+
+                    # Workstream H + A: push event + materialize behavior_semantic immediately
+                    # (so gating is driven from SOT layer, Excel can see it, thin deployments respect it)
+                    if update_behavior_semantic_from_event is not None:
+                        try:
+                            update_behavior_semantic_from_event(
+                                "1i_Bandit",
+                                "emotional_entry_continue",
+                                {"focus": intent, "feeling": feeling, "driving": driving or ""}
+                            )
+                        except Exception:
+                            pass  # non-fatal; session flag still works
+
                     st.rerun()
 
             # After Emotional Entry is complete, show the rest of the Friend surfaces
@@ -820,8 +973,8 @@ No adjustments are currently required. Stay with your existing plan and cadence.
         # Gate Identity Card and Guided Question behind completed Emotional Entry (per spine order) - logic applied via the earlier gate for pacing.
 
         # Gate the remaining Friend surfaces behind completed Emotional Entry for sequential, calm pacing.
-        # (Request block, Memory Graph, Identity Card, Guided Question appear only after the user has shared context or in Unfiltered View.)
-        if st.session_state.get("emotional_entry_done", False) or st.session_state.get("unfiltered_view", False):
+        # Uses centralized should_show_post_entry_content() for Workstream H.
+        if should_show_post_entry_content():
             # SURFACE 1.5: THE DYNAMIC ONBOARDING STATUS RIBBON (Collapsed Banner)
             st.markdown("---")
             focus = st.session_state.get("onboarding_focus", "Understand My Allocation Setup")
@@ -977,7 +1130,8 @@ div[data-testid="stVerticalBlock"] > div {
         capture_event("portfolio_check", {"portfolio": state.selected_portfolio})
 
         # Demo button to simulate the panic pattern (high checking + projection + hover)
-        if st.button("Simulate panic pattern (high checking + hover for demo)", key="btn_simulate_panic"):
+        # Hidden in pure Friend deployment for clean companion experience
+        if not is_friend_deployment and st.button("Simulate panic pattern (high checking + hover for demo)", key="btn_simulate_panic"):
             capture_event("projection_view", {"portfolio": state.selected_portfolio})
             capture_event("hover_sell", {"portfolio": state.selected_portfolio})
             st.session_state["behavioral_state"] = "CALMING"
@@ -1057,7 +1211,7 @@ div[data-testid="stVerticalBlock"] > div {
         if continuity_header:
             st.caption(continuity_header)
 
-        if st.session_state.get("emotional_entry_done", False) or st.session_state.get("unfiltered_view", False):
+        if should_show_post_entry_content():
             # === Friend Mode Identity Card ===
             # Now passes the (potentially edited) profile so it reflects user input.
             identity_card = get_friend_identity_card_data(
@@ -1104,7 +1258,7 @@ div[data-testid="stVerticalBlock"] > div {
 
                 st.markdown('</div>', unsafe_allow_html=True)
 
-        if st.session_state.get("emotional_entry_done", False) or st.session_state.get("unfiltered_view", False):
+        if should_show_post_entry_content():
             # === First Guided Question ===
             # Now reacts to the live-edited profile.
             guided = get_first_guided_question(
@@ -1234,6 +1388,11 @@ div[data-testid="stVerticalBlock"] > div {
                 if unfiltered:
                     st.session_state["unfiltered_view"] = True
                     force_neutral_all_slots()
+                    if update_behavior_semantic_from_event is not None:
+                        try:
+                            update_behavior_semantic_from_event("1i_Bandit", "unfiltered_view_enabled", {})
+                        except Exception:
+                            pass
                 else:
                     st.session_state["unfiltered_view"] = False
                 edits = {

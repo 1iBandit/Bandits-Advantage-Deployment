@@ -23,7 +23,9 @@ class BehavioralEvent:
 
 
 def capture_event(event_type: str, context: Optional[Dict[str, Any]] = None) -> None:
-    """Append an event to the session stream."""
+    """Append an event to the session stream.
+    Also dual-writes to SOT behavior_events_raw (encrypted) for semantic layer + gating.
+    """
     import streamlit as st
 
     if "behavioral_events" not in st.session_state:
@@ -35,6 +37,19 @@ def capture_event(event_type: str, context: Optional[Dict[str, Any]] = None) -> 
         context=context or {},
     )
     st.session_state["behavioral_events"].append(event)
+
+    # Dual-write to SOT raw behavior (non-fatal, supports Workstream A/H + migration)
+    try:
+        from src.sot.raw import write_behavior_events_raw
+        # Use a general or sandbox tenancy; UI buddy is "1i_Bandit"
+        buddy = st.session_state.get("buddy_id", "1i_Bandit")
+        write_behavior_events_raw(buddy, [{
+            "event_type": event_type,
+            "payload": context or {},
+            "timestamp": event.timestamp.isoformat(),
+        }])
+    except Exception:
+        pass  # keep legacy behavior intact
 
 
 def get_events() -> List[BehavioralEvent]:

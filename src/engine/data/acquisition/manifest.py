@@ -92,6 +92,14 @@ def create_run_manifest(
         json.dump(manifest, f, indent=2, default=str)
 
     manifest["_manifest_path"] = str(manifest_path)  # convenience for callers
+
+    # Dual-write Parquet projection to SOT (acquisition_manifests) for semantic consumers
+    try:
+        from src.sot.raw import write_acquisition_manifest_parquet
+        write_acquisition_manifest_parquet(manifest)
+    except Exception:
+        pass
+
     return manifest
 
 
