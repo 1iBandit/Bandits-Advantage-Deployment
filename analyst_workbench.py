@@ -95,11 +95,14 @@ from src.engine.portfolio.behavior import (
 # SOT v0.2 (A/B/H) — semantic layer for gating + raw writers (raw access auto-blocks in Friend deployment)
 try:
     from src.sot.semantic import get_gating_state, update_behavior_semantic_from_event
-    from src.sot import is_friend_deployment
 except Exception:
     get_gating_state = None
     update_behavior_semantic_from_event = None
-    def is_friend_deployment(): return os.environ.get("FRIEND_OF_1IBANDIT_DEPLOYMENT", "0") == "1"
+
+# Note: We deliberately read the env var directly for the deployment flag.
+# This avoids UnboundLocalError / import-order problems when the file is executed
+# via runpy in Streamlit Cloud thin wrapper. The SOT modules themselves also
+# check the env live for raw access blocking.
 from src.engine.portfolio.workbench_ui import (
     WorkbenchSessionState,
     render_full_workbench_with_flows,
@@ -283,9 +286,10 @@ def main():
         )
 
     # Deployment guard (FRIEND_OF_1IBANDIT_DEPLOYMENT)
-    # Use live function (SOT also enforces raw blocks)
-    _is_friend = is_friend_deployment() if callable(is_friend_deployment) else (os.environ.get("FRIEND_OF_1IBANDIT_DEPLOYMENT", "0") == "1")
-    is_friend_deployment = _is_friend  # for the rest of main() logic
+    # Read directly from env var. This is the most reliable way when the script
+    # is executed via runpy in the Streamlit Cloud thin wrapper (avoids any
+    # import scoping / UnboundLocalError issues).
+    is_friend_deployment = os.environ.get("FRIEND_OF_1IBANDIT_DEPLOYMENT", "0") == "1"
 
     # Deployment guard (canonical refinement loop, 2026-06-15)
     # When FRIEND_OF_1IBANDIT_DEPLOYMENT=1 (set by the public thin wrapper),
